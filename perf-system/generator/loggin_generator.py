@@ -1,8 +1,9 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the Apache 2.0 License.
-from generator import create_parquet, create_post, create_get
+from generator import create_parquet, create_verb
 
 MYHOST = "127.0.0.1:8000"
+REQUEST_CONTENT_TYPE = "content-type: application/json"
 
 
 # for i in range(100200):
@@ -17,14 +18,16 @@ for i in range(12):
     MYPATH = "/app/log/private"
     DATA = '{"id": 45, "msg": "Logged to private table"}'
 
-    create_post(MYHOST, MYPATH, MYTYPE, DATA)
-for i in range(13):
+    create_verb(
+        "post", MYHOST, MYPATH, MYTYPE, req_message=DATA, headers=[REQUEST_CONTENT_TYPE]
+    )
+for i in range(14):
 
     MYTYPE = "HTTP/1.1"
     MYPATH = "/app/log/private?id=45"
     # DATA = '{"id": ' + str(i) + ', "msg": "Logged to private table"}'
 
-    create_get(MYHOST, MYPATH, MYTYPE)
+    create_verb("delete", MYHOST, MYPATH, MYTYPE, headers=[REQUEST_CONTENT_TYPE])
 # for i in range(10000):
 #     MYTYPE = "HTTP/1.1"
 #     MYPATH = "/app/log/private"
