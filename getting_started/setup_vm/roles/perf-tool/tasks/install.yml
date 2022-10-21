@@ -16,7 +16,7 @@
   apt:
     name: libarrow-dev
     state: present
-  become: true  
+  become: true
 
 - name: Instal libparquet-dev
   apt:
