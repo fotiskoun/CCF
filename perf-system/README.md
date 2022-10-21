@@ -42,30 +42,19 @@ In the **CCF/perf-system/submitter** there are two submitter components one writ
 
 ### C++
 
-For the **C++** submitter you first need to download and build the arrow and parquet libraries from the following repository `https://github.com/apache/arrow`.
-For a quick guide to build the above repo please use the following commands
+For the **C++** submitter one of the main requirements is Apache Arrow and Parquet. To install these requirements, if you haven't done yet, please install the requirements from the **CCF/getting-started/setup_vm** directory following the below command.
 
 ```sh
-git clone https://github.com/apache/arrow.git
-cd arrow/cpp
-mkdir release
-cd release
-cmake .. -DCMAKE_INSTALL_PREFIX=/path/to/install -DARROW_FILESYSTEM=ON -DARROW_PARQUET=ON
-make
-make install
-```
+./run.sh ccf-dev.yml
+``` 
 
-Take extra care with the options given to the cmake command. `-DARROW_FILESYSTEM=ON` and `-DARROW_PARQUET=ON` will install the necessary libraries in addition to arrow, which are necessary for the submitter execution.
-
-Edit the `/path/to/install` on the cmake command with a path inside your system that you want the libraries to be installed. This path is necessary fo the cmake file of the submitter. Replace inside the **CCF/perf-system/submitter/CmakeLists.txt** in lines 7, 9 and 10 the absolute paths `/home/fotisk/include/` and `/home/fotisk/lib/` to `/path/to/install/include/` and `/path/to/install/lib/` respectively.
-
-After installing arrow and changing CMakeLists.txt accordingly execute the commands below to run your program from the **CCF/perf-system/submitter/** directory.
+After installing arrow you can run the submitter from **CCF/perf-system/submitter/** directory using the following commands:
 
 ```sh
 mkdir build
 cd build
 CC=/usr/bin/clang-10 CXX=/usr/bin/clang++-10 cmake -GNinja ..
-make
+ninja
 cd ..
 ./build/submit -manual_configurations
 ```
