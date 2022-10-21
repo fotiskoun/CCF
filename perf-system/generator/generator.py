@@ -24,78 +24,47 @@ def fill_df(host, req_path, req_type, req_verb, req_iters, data):
 
     print("Starting generation of requests")
     for _ in range(req_iters):
-        if req_verb == "POST":
-            create_post(host, req_path, req_type, data)
-
-        elif req_verb == "GET":
-            create_get(host, req_path, req_type)
-
-        elif req_verb == "DELETE":
-            create_delete(host, req_path, req_type)
+        create_verb(
+            req_verb,
+            host,
+            req_path,
+            req_type,
+            req_message=data,
+            headers=[REQUEST_CONTENT_TYPE],
+        )
 
     print("Finished generation of requests")
 
 
-def create_get(host, req_path, req_type):
+def create_verb(
+    verb: str, host: str, req_path: str, req_type: str, req_message="", headers=None
+) -> None:
     """
-    Generate get queries
+    Generate queries
     """
+    headers_string = "\r\n".join(headers) + "\r\n"
+    data_headers = ""
+    if len(req_message) > 0:
+        data_headers = (
+            REQUEST_LENGTH_TEXT + str(len(req_message)) + "\r\n\r\n" + req_message
+        )
+    else:
+        data_headers = "\r\n"
+
     ind = len(df.index)
     df.loc[ind] = [
         str(ind),
-        "GET "
+        verb.upper()
+        + " "
         + req_path
         + " "
         + req_type
         + "\r\n"
-        + REQUEST_CONTENT_TYPE
-        + "\r\n"
         + "host: "
         + host
-        + "\r\n\r\n",
-    ]
-
-
-def create_post(host, req_path, req_type, request_message):
-    """
-    Generate post queries
-    """
-    ind = len(df.index)
-    df.loc[ind] = [
-        str(ind),
-        "POST "
-        + req_path
-        + " "
-        + req_type
         + "\r\n"
-        + REQUEST_LENGTH_TEXT
-        + str(len(request_message))
-        + "\r\n"
-        + REQUEST_CONTENT_TYPE
-        + "\r\n"
-        + "host: "
-        + host
-        + "\r\n\r\n"
-        + request_message,
-    ]
-
-
-def create_delete(host, req_path, req_type):
-    """
-    Generate delete queries
-    """
-    ind = len(df.index)
-    df.loc[ind] = [
-        str(ind),
-        "DELETE"
-        + "$"
-        + host
-        + "$"
-        + req_path
-        + "$"
-        + req_type
-        + "$"
-        + REQUEST_CONTENT_TYPE,
+        + headers_string
+        + data_headers,
     ]
 
 

@@ -33,7 +33,8 @@ By default, the generator will create a .parquet file, which is necessary for th
 - `-pf, --parquet_filename`: Name of the parquet file to store the generated requests. Default file `./requests.parquet`
 - `-d, --data`: A string with the data to be sent in a POST or DELETE request
 
-This component consists of 3 different files. The **CCF/perf-system/Generator/loggin_generator.py** is an alternative of the command line options run providing more flexibility to the user in order to create his own more complex requests. There exist some samples, calling `create_post()` and `create_get()` functions to initiate rows of requests. All requests in the end should be followed by the `create_parquet()` function in order to generate the parquet file.
+This component consists of different files including the **CCF/perf-system/Generator/loggin_generator.py**, which is an alternative of the command line options, providing more flexibility to the user in order to create his own more complex requests. There exist some samples, calling `create_verb()` function to initiate rows of requests. The `create_verb()` function will optionally take a string representing the data you want to post on the server and/or a list of strings representing the headers to be included to the request. The `content length` header will be automatically generated once the data are provided.
+All requests in the end should be followed by the `create_parquet()` function in order to generate the parquet file.
 You can either edit **CCF/perf-system/Generator/loggin_generator.py** or create your own file in the same directory calling functions from the **CCF/perf-system/Generator/generator.py** in order to construct your own series of requests.
 
 ## Submitter
