@@ -34,9 +34,7 @@ def make_analysis(send_file, response_file):
         status_list = req_resp[0].split(" ")
         req_type_received = status_list[0]
         # if we get a full statues and says ok increase the successful
-        if len(status_list) > 2 and (
-            status_list[2][:2] == "OK" or status_list[1][:3] == "200"
-        ):
+        if len(status_list) > 1 and status_list[1][:3] == "200":
             successful_reqs += 1
 
         time_spent_list.append(

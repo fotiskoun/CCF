@@ -10,7 +10,7 @@ import ssl
 import argparse
 
 # pylint: disable=import-error
-import aiohttp  # type: ignore
+import httpx  # type: ignore
 import pandas as pd  # type: ignore
 
 # pylint: disable=import-error
@@ -65,38 +65,35 @@ async def read(certificates, file_names, duration, server_address):
         duration_end_time < 0 and run_loop_once
     ):
         last_index = len(df_sends.index)
-        async with aiohttp.ClientSession() as session:
+        async with httpx.AsyncClient(verify=sslcontext, http2=True) as session:
             for i in range(len(req_details)):
                 if req_details[i][0] == "POST":
                     df_sends.loc[i + last_index] = [i + last_index, time.time()]
-                    async with session.post(
+                    resp = await session.post(
                         server_address + req_details[i][1],
                         data=req_data[i],
                         headers=req_headers[i],
-                        ssl=sslcontext,
-                    ) as resp:
-                        end_time = time.time()
-                        write_response(resp, df_responses, end_time, i, last_index)
+                    )
+                    end_time = time.time()
+                    write_response(resp, df_responses, end_time, i, last_index)
 
                 elif req_details[i][0] == "GET":
                     df_sends.loc[i + last_index] = [i + last_index, time.time()]
-                    async with session.get(
+                    resp = await session.get(
                         server_address + req_details[i][1],
                         headers=req_headers[i],
-                        ssl=sslcontext,
-                    ) as resp:
-                        end_time = time.time()
-                        write_response(resp, df_responses, end_time, i, last_index)
+                    )
+                    end_time = time.time()
+                    write_response(resp, df_responses, end_time, i, last_index)
 
                 elif req_details[i][0] == "DELETE":
                     df_sends.loc[i + last_index] = [i + last_index, time.time()]
-                    async with session.delete(
+                    resp = await session.delete(
                         server_address + req_details[i][1],
                         headers=req_headers[i],
-                        ssl=sslcontext,
-                    ) as resp:
-                        end_time = time.time()
-                        write_response(resp, df_responses, end_time, i, last_index)
+                    )
+                    end_time = time.time()
+                    write_response(resp, df_responses, end_time, i, last_index)
 
                 if time.time() > duration_end_time and not run_loop_once:
                     duration_run = False
@@ -111,18 +108,20 @@ def write_response(resp, df_responses, end_time, i, last_index):
     """
     Populate the dataframe for responses
     """
+    resp_headers = str(resp.headers)
+    if len(resp_headers) > 10:
+        resp_headers = resp_headers[9:-2].replace("'", "")
+        resp_headers = resp_headers.replace(", ", "\n")
     df_responses.loc[i + last_index] = [
         i + last_index,
         end_time,
-        resp.url.scheme
-        + str(resp.version.major)
-        + str(resp.version.minor)
+        str(resp.http_version)
         + " "
-        + str(resp.status)
-        + " "
-        + resp.reason
+        + str(resp.status_code)
         + "\n"
-        + str(resp.raw_headers),
+        + resp_headers
+        + "\n"
+        + resp.text[10:-1],
     ]
 
 
