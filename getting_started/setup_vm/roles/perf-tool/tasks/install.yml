@@ -12,6 +12,11 @@
   apt: deb="{{ workspace }}/arrow.deb"
   become: true
 
+- name: Update after installing arrow 
+  apt:
+    update_cache: yes
+  become: true
+
 - name: Instal libarrow-dev
   apt:
     name: libarrow-dev
