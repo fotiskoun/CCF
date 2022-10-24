@@ -13,33 +13,27 @@ add_executable(
 )
 
 set(CCF_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+set(CCF_3RD_PARTY_EXPORTED_DIR "${CCF_DIR}/3rdparty/exported")
 
 include(${CCF_DIR}/cmake/tools.cmake)
 include(${CCF_DIR}/cmake/crypto.cmake)
 
 include_directories(${CCF_DIR}/include)
-include_directories(${CCF_DIR}/3rdparty/exported)
+include_directories(${CCF_3RD_PARTY_EXPORTED_DIR})
 include_directories(${CCF_DIR}/src)
+
+
+set(HTTP_PARSER_SOURCES
+    ${CCF_3RD_PARTY_EXPORTED_DIR}/llhttp/api.c
+    ${CCF_3RD_PARTY_EXPORTED_DIR}/llhttp/http.c
+    ${CCF_3RD_PARTY_EXPORTED_DIR}/llhttp/llhttp.c
+)
+
+
+add_library(http_parser.host "${HTTP_PARSER_SOURCES}")
+
 
 target_link_libraries(submit PRIVATE arrow)
 target_link_libraries(submit PRIVATE parquet)
-target_link_libraries(submit PRIVATE curl)
-target_link_libraries(submit PRIVATE uv)
-target_link_libraries(submit PRIVATE ssl)
-target_link_libraries(submit PRIVATE crypto)
 target_link_libraries(submit PRIVATE ccfcrypto.host)
-target_link_libraries(
-  submit
-  PRIVATE
-    ${CCF_DIR}/build/CMakeFiles/http_parser.host.dir/3rdparty/exported/llhttp/llhttp.c.o
-)
-target_link_libraries(
-  submit
-  PRIVATE
-    ${CCF_DIR}/build/CMakeFiles/http_parser.host.dir/3rdparty/exported/llhttp/api.c.o
-)
-target_link_libraries(
-  submit
-  PRIVATE
-    ${CCF_DIR}/build/CMakeFiles/http_parser.host.dir/3rdparty/exported/llhttp/http.c.o
-)
+target_link_libraries(submit PRIVATE http_parser.host)
