@@ -126,6 +126,62 @@ def customize_table(fields_list, values_list: List[List]):
     return custom_table
 
 
+def plot_latency_by_id(df_sends):
+    id_unit = [x for x in range(0, len(df_sends.index))]
+    lat_unit = ms_latency_list
+    plt.figure()
+    plt.scatter(id_unit, lat_unit, s=1)
+    plt.ylabel("Latency_ms")
+    plt.xlabel("ids")
+    plt.savefig("latency_per_id.png")
+    plt.figure(figsize=(15, 15), dpi=80)
+
+
+def plot_latency_across_time(df_responses):
+    time_unit = [
+        x - df_responses["receiveTime"][0] + 1 for x in df_responses["receiveTime"]
+    ]
+    plt.figure()
+    plt.scatter(time_unit, ms_latency_list, s=1)
+    plt.ylabel("Latency(ms)")
+    plt.xlabel("time(s)")
+    plt.savefig("latency_across_time.png")
+    plt.figure(figsize=(15, 15), dpi=80)
+
+
+def plot_throughput_per_block(df_responses, time_block):
+    """
+    It splits the dataset in buckets of time_block seconds difference
+    and will plot the throughput for each bucket
+    """
+    # sort the latencies as it make sense to get the throughput
+    # by time unit ignoring the ids
+    sorted_latencies = sorted(df_responses["receiveTime"].tolist())
+    block_indexes = [0]
+    for i, lat in enumerate(sorted_latencies):
+        if lat > sorted_latencies[block_indexes[-1]] + time_block:
+            block_indexes.append(i)
+    req_per_block = []
+    block_latency = []
+    if len(block_indexes) > 1:
+        for i in range(len(block_indexes) - 1):
+            req_per_block.append(block_indexes[i + 1] - block_indexes[i])
+            block_latency.append(time_block * SEC_MS * (i + 1))
+        req_per_block.append(len(sorted_latencies) - 1 - block_indexes[-1])
+        block_latency.append(
+            block_latency[-1]
+            + int((sorted_latencies[-1] - sorted_latencies[block_indexes[-1]]) * SEC_MS)
+        )
+    throughput_per_block = [
+        x / time_block for x in req_per_block
+    ]  # x*10 because is 0.1s per input
+    plt.figure(3)
+    plt.plot(block_latency, throughput_per_block)
+    plt.ylabel("Throughput(req/s)")
+    plt.xlabel("time(ms)")
+    plt.savefig("throughput_across_time.png")
+
+
 def make_analysis(send_file, response_file):
     """
     Produce the analysis results
@@ -142,57 +198,10 @@ def make_analysis(send_file, response_file):
 
     x = ["-"] * 20
     print("\n", "".join(x), " Start plotting  ", "".join(x))
-    time_unit = [
-        x - df_responses["receiveTime"][0] + 1 for x in df_responses["receiveTime"]
-    ]
 
-    id_unit = [x for x in range(0, len(df_sends.index))]
-    lat_unit = ms_latency_list
-
-    # sort the latencies as it make sense to get the throughput
-    # by time unit ignoring the ids
-    sorted_latencies = sorted(df_responses["receiveTime"].tolist())
-    idxes_100ms = [0]
-    for i, lat in enumerate(sorted_latencies):
-        if lat > sorted_latencies[idxes_100ms[-1]] + 0.1:
-            idxes_100ms.append(i)
-
-    req_per_100ms = []
-    time_in_100ms_parts = []
-    if len(idxes_100ms) > 1:
-        for i in range(len(idxes_100ms) - 1):
-            req_per_100ms.append(idxes_100ms[i + 1] - idxes_100ms[i])
-            time_in_100ms_parts.append(100 * (i + 1))
-        req_per_100ms.append(len(sorted_latencies) - 1 - idxes_100ms[-1])
-        time_in_100ms_parts.append(
-            time_in_100ms_parts[-1]
-            + int((sorted_latencies[-1] - sorted_latencies[idxes_100ms[-1]]) * 1000)
-        )
-    throughput_per_100ms = [
-        x * 10 for x in req_per_100ms
-    ]  # x*10 because is 0.1s per input
-
-    # plot latency with ids
-    plt.figure(1)
-    plt.scatter(id_unit, lat_unit, s=1)
-    plt.ylabel("Latency_ms")
-    plt.xlabel("ids")
-    plt.savefig("latency_per_id.png")
-    plt.figure(figsize=(15, 15), dpi=80)
-    # plot latency with time
-    plt.figure(2)
-    plt.scatter(time_unit, ms_latency_list, s=1)
-    plt.ylabel("Latency(ms)")
-    plt.xlabel("time(s)")
-    plt.savefig("latency_across_time.png")
-    plt.figure(figsize=(15, 15), dpi=80)
-
-    # plot throughput with time
-    plt.figure(3)
-    plt.plot(time_in_100ms_parts, throughput_per_100ms)
-    plt.ylabel("Throughput(req/s)")
-    plt.xlabel("time(ms)")
-    plt.savefig("throughput_across_time.png")
+    plot_latency_by_id(df_sends)
+    plot_latency_across_time(df_responses)
+    plot_throughput_per_block(df_responses, 0.1)
 
     print("\n", "".join(x), "Finished plotting", "".join(x))
 
