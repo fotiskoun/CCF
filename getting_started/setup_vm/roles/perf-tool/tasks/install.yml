@@ -31,6 +31,6 @@
 
 - name: Instal libstdcxx
   apt:
-    name: ibstdc++-11-dev
+    name: libstdc++-11-dev
     state: present
   become: true
