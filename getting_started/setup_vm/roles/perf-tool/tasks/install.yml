@@ -28,3 +28,9 @@
     name: libparquet-dev
     state: present
   become: true
+
+- name: Instal libstdcxx
+  apt:
+    name: ibstdc++-11-dev
+    state: present
+  become: true
