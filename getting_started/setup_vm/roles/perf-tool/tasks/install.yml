@@ -29,6 +29,13 @@
     state: present
   become: true
 
+- name: Add stdcxx APT repository
+  apt_repository:
+    repo: "ppa:ubuntu-toolchain-r/test"
+    state: present
+    update_cache: yes
+  become: true
+
 - name: Instal libstdcxx
   apt:
     name: libstdc++-11-dev
