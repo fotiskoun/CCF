@@ -6,7 +6,6 @@ set(CMAKE_CXX_STANDARD 20)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -w")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libstdc++")
 
 add_executable(
   submit submit.cpp handle_arguments.cpp handle_arguments.hpp stdcpp.h
@@ -26,7 +25,7 @@ set(HTTP_PARSER_SOURCES
     ${CCF_3RD_PARTY_EXPORTED_DIR}/llhttp/http.c
     ${CCF_3RD_PARTY_EXPORTED_DIR}/llhttp/llhttp.c
 )
-add_library(http_parser.host "${HTTP_PARSER_SOURCES}")
+add_library(stdcxxhttp_parser.host "${HTTP_PARSER_SOURCES}")
 
 set(CCFCRYPTO_SRC
     ${CCF_DIR}/src/crypto/base64.cpp
@@ -49,8 +48,8 @@ set(CCFCRYPTO_SRC
 )
 
 
-add_library(ccfcrypto.host STATIC "${CCFCRYPTO_SRC}")
-target_link_libraries(ccfcrypto.host PUBLIC crypto)
-target_link_libraries(ccfcrypto.host PUBLIC ssl)
+add_library(stdcxxccfcrypto.host STATIC "${CCFCRYPTO_SRC}")
+target_link_libraries(stdcxxccfcrypto.host PUBLIC crypto)
+target_link_libraries(stdcxxccfcrypto.host PUBLIC ssl)
 
-target_link_libraries(submit PRIVATE http_parser.host ccfcrypto.host arrow parquet)
+target_link_libraries(submit PRIVATE stdcxxhttp_parser.host stdcxxccfcrypto.host arrow parquet)
