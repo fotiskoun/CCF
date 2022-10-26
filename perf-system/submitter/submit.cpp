@@ -14,9 +14,7 @@
 #include <arrow/array/array_binary.h>
 #include <arrow/filesystem/localfs.h>
 #include <arrow/io/file.h>
-#include <chrono>
 #include <ctime>
-#include <curl/curl.h>
 #include <iostream>
 #include <openssl/bio.h>
 #include <openssl/err.h>
@@ -24,7 +22,6 @@
 #include <openssl/ssl.h>
 #include <parquet/arrow/reader.h>
 #include <parquet/stream_writer.h>
-#include <uv.h>
 #include <vector>
 
 using namespace std;

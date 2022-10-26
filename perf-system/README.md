@@ -43,32 +43,20 @@ In the **CCF/perf-system/submitter** there are two submitter components one writ
 
 ### C++
 
-For the **C++** submitter you first need to download and build the arrow and parquet libraries from the following repository `https://github.com/apache/arrow`.
-For a quick guide to build the above repo please use the following commands
+For the **C++** submitter one of the main requirements is Apache Arrow and Parquet. To install these requirements, if you haven't done yet, please install the requirements from the **CCF/getting-started/setup_vm** directory following the below command.
 
 ```sh
-git clone https://github.com/apache/arrow.git
-cd arrow/cpp
-mkdir release
-cd release
-cmake .. -DCMAKE_INSTALL_PREFIX=/path/to/install -DARROW_FILESYSTEM=ON -DARROW_PARQUET=ON
-make
-make install
-```
+./run.sh ccf-dev.yml
+``` 
 
-Take extra care with the options given to the cmake command. `-DARROW_FILESYSTEM=ON` and `-DARROW_PARQUET=ON` will install the necessary libraries in addition to arrow, which are necessary for the submitter execution.
-
-Edit the `/path/to/install` on the cmake command with a path inside your system that you want the libraries to be installed. This path is necessary fo the cmake file of the submitter. Replace inside the **CCF/perf-system/submitter/CmakeLists.txt** in lines 7, 9 and 10 the absolute paths `/home/fotisk/include/` and `/home/fotisk/lib/` to `/path/to/install/include/` and `/path/to/install/lib/` respectively.
-
-After installing arrow and changing CMakeLists.txt accordingly execute the commands below to run your program from the **CCF/perf-system/submitter/** directory.
+After installing arrow you can build and run the submitter from the root CCF directory **CCF/build/**. If you haven't done before, create a build directory in `CCF` and then build and run using the following commands:
 
 ```sh
 mkdir build
 cd build
-CC=/usr/bin/clang-10 CXX=/usr/bin/clang++-10 cmake -GNinja ..
-make
-cd ..
-./build/submit -manual_configurations
+cmake -GNinja ..
+ninja submit
+./submit -manual_configurations
 ```
 
 You can provide certification files or configure import/export files by replacing `-manual_configurations` in the latest command with one or more of the following options, providing after each option the corresponsing argument (where necessary).
@@ -76,9 +64,9 @@ You can provide certification files or configure import/export files by replacin
 - `-c`: Followed by the path to the certificate file
 - `-k`: Followed by the path to the private key file
 - `-ca`: Followed by the path to the specified certificate file to verify the peer
-- `-gf`: Followed by the path to the file that contains the generated requests. Default file `../generator/requests.parquet`
-- `-sf`: Followed by the path to the parquet file to store submission information for the requests that have been submitted. Default file `./cpp_sends.parquet`.
-- `-rf`: Followed by the path to the parquet file to store the responses from the requests that have been submitted. Default file `./cpp_responses.parquet`.
+- `-gf`: Followed by the path to the file that contains the generated requests. Default file `../perf-system/generator/requests.parquet`
+- `-sf`: Followed by the path to the parquet file to store submission information for the requests that have been submitted. Default file `../perf-system/submitter/cpp_sends.parquet`.
+- `-rf`: Followed by the path to the parquet file to store the responses from the requests that have been submitted. Default file `../perf-system/submitter/cpp_responses.parquet`.
 - `-pipeline`: The existence of this option will force the submitter to use HTTP/1.1 pipelining.
 - `-sa`: Followed by the server address (`host:port`) to submit the requests. Default server address `127.0.0.1:8000`
 
