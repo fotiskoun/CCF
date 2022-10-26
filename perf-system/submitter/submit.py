@@ -5,6 +5,7 @@ Submit requests
 """
 
 import asyncio
+import http
 import time
 import ssl
 import argparse
@@ -38,11 +39,19 @@ async def read(certificates, file_names, duration, server_address):
 
     print("Starting Formalizing Data")
 
+    # get the http version from the first request
+    http_vers = req_df.iloc[0]["request"].split("\r\n")[0].split(" ")[-1]
+    is_http2 = False
+    if http_vers.upper() == "HTTP/2":
+        is_http2 = True
+
     # create the requests
     for i, req_row in req_df.iloc[:].iterrows():
         req = req_row["request"].split("\r\n")
         req_details.append(req[0].split(" "))
-        req_headers.append({x.split(":")[0]: x.split(":")[1] for x in req[1:-2]})
+        req_headers.append(
+            {x.split(":")[0].strip(): x.split(":")[1].strip() for x in req[1:-2]}
+        )
         if req_details[i][0] == "GET":
             req_data.append("")
         else:
@@ -65,7 +74,7 @@ async def read(certificates, file_names, duration, server_address):
         duration_end_time < 0 and run_loop_once
     ):
         last_index = len(df_sends.index)
-        async with httpx.AsyncClient(verify=sslcontext, http2=True) as session:
+        async with httpx.AsyncClient(verify=sslcontext, http2=is_http2) as session:
             for i in range(len(req_details)):
                 if req_details[i][0] == "POST":
                     df_sends.loc[i + last_index] = [i + last_index, time.time()]
