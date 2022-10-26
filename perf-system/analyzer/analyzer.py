@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the Apache 2.0 License.
+
 import pandas as pd  # type: ignore
 
 # pylint: disable=import-error
@@ -75,12 +78,11 @@ def time_success_thoughput_table(
     ]
 
     time_spent = total_time_in_sec(df_sends, df_responses)
-    ms_time_spent_sum = sec_to_ms(time_spent)
 
     generic_output_table.add_row(
         [
             len(df_sends.index),
-            round(ms_time_spent_sum / 1000, 3),
+            round(time_spent, 3),
             round(successful_percent, 1),
             round(100 - successful_percent, 1),
             round(len(df_sends.index) / time_spent, 1),
