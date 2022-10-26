@@ -61,4 +61,4 @@ for i in range(10):
         headers=[REQUEST_CONTENT_TYPE],
     )
 
-create_parquet("new_raw.parquet")
+create_parquet("lskv.parquet")
