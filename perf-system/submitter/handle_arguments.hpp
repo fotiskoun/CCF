@@ -12,9 +12,10 @@ public:
   std::string key;
   std::string rootCa;
   std::string server_address = "127.0.0.1:8000";
-  std::string send_filename = "./cpp_send.parquet";
-  std::string response_filename = "./cpp_respond.parquet";
-  std::string generator_filename = "../generator/requests.parquet";
+  std::string send_filename = "../perf-system/submitter/cpp_send.parquet";
+  std::string response_filename =
+    "../perf-system/submitter/cpp_respond.parquet";
+  std::string generator_filename = "../perf-system/generator/requests.parquet";
   bool isPipeline = false;
   int duration = -1;
   ArgumentParser();

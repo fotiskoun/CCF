@@ -48,15 +48,14 @@ For the **C++** submitter one of the main requirements is Apache Arrow and Parqu
 ./run.sh ccf-dev.yml
 ``` 
 
-After installing arrow you can run the submitter from **CCF/perf-system/submitter/** directory using the following commands:
+After installing arrow you can build and run the submitter from the root CCF directory **CCF/build/**. If you haven't done before, create a build directory in `CCF` and then build and run using the following commands:
 
 ```sh
 mkdir build
 cd build
-CC=/usr/bin/clang-10 CXX=/usr/bin/clang++-10 cmake -GNinja ..
-ninja
-cd ..
-./build/submit -manual_configurations
+cmake -GNinja ..
+ninja submit
+./submit -manual_configurations
 ```
 
 You can provide certification files or configure import/export files by replacing `-manual_configurations` in the latest command with one or more of the following options, providing after each option the corresponsing argument (where necessary).
@@ -64,9 +63,9 @@ You can provide certification files or configure import/export files by replacin
 - `-c`: Followed by the path to the certificate file
 - `-k`: Followed by the path to the private key file
 - `-ca`: Followed by the path to the specified certificate file to verify the peer
-- `-gf`: Followed by the path to the file that contains the generated requests. Default file `../generator/requests.parquet`
-- `-sf`: Followed by the path to the parquet file to store submission information for the requests that have been submitted. Default file `./cpp_sends.parquet`.
-- `-rf`: Followed by the path to the parquet file to store the responses from the requests that have been submitted. Default file `./cpp_responses.parquet`.
+- `-gf`: Followed by the path to the file that contains the generated requests. Default file `../perf-system/generator/requests.parquet`
+- `-sf`: Followed by the path to the parquet file to store submission information for the requests that have been submitted. Default file `../perf-system/submitter/cpp_sends.parquet`.
+- `-rf`: Followed by the path to the parquet file to store the responses from the requests that have been submitted. Default file `../perf-system/submitter/cpp_responses.parquet`.
 - `-pipeline`: The existence of this option will force the submitter to use HTTP/1.1 pipelining.
 - `-sa`: Followed by the server address (`host:port`) to submit the requests. Default server address `127.0.0.1:8000`
 
