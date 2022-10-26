@@ -1,10 +1,3 @@
-# Copyright (c) Microsoft Corporation. All rights reserved.
-# Licensed under the Apache 2.0 License.
-"""
-Provide metrics based on the requests sent
-"""
-
-import argparse
 import pandas as pd  # type: ignore
 
 # pylint: disable=import-error
@@ -18,11 +11,11 @@ ms_latency_list = []
 SEC_MS = 1000
 
 
-def get_latency_list() -> list:
+def get_latency_list() -> List:
     return latency_list
 
 
-def get_ms_latency_list() -> list:
+def get_ms_latency_list() -> List:
     return ms_latency_list
 
 
@@ -30,12 +23,12 @@ def get_req_type(df_responses: pd.DataFrame) -> str:
     return df_responses.iloc[0]["rawResponse"].split(" ")[0]
 
 
-def get_latency_at_i(df_sends, df_responses, req_id):
+def get_latency_at_i(df_sends: pd.DataFrame, df_responses: pd.DataFrame, req_id: int):
     # will need to handle the re-submission response from submitter when decided
     return df_responses.iloc[req_id]["receiveTime"] - df_sends.iloc[req_id]["sendTime"]
 
 
-def check_success(df_responses, req_id) -> int:
+def check_success(df_responses: pd.DataFrame, req_id: int) -> int:
     req_resp = df_responses.iloc[req_id]["rawResponse"].split("\n")
     status_list = req_resp[0].split(" ")
     # if we get a full statues and says ok increase the successful
@@ -44,7 +37,9 @@ def check_success(df_responses, req_id) -> int:
     return 0
 
 
-def iter_for_success_and_latency(df_sends, df_responses) -> float:
+def iter_for_success_and_latency(
+    df_sends: pd.DataFrame, df_responses: pd.DataFrame
+) -> float:
     successful_reqs = 0
 
     for i in range(len(df_sends.index)):
@@ -57,16 +52,18 @@ def iter_for_success_and_latency(df_sends, df_responses) -> float:
     return successful_reqs / len(df_sends.index) * 100
 
 
-def total_time_in_sec(df_sends, df_responses):
+def total_time_in_sec(df_sends: pd.DataFrame, df_responses: pd.DataFrame):
     # time_spent is: last timestamp of responses - first timestamp of sends
     return df_responses.iloc[-1]["receiveTime"] - df_sends.iloc[0]["sendTime"]
 
 
-def sec_to_ms(time_in_sec):
+def sec_to_ms(time_in_sec: float) -> float:
     return time_in_sec / SEC_MS
 
 
-def time_success_thoughput_table(df_sends, df_responses, successful_percent):
+def time_success_thoughput_table(
+    df_sends: pd.DataFrame, df_responses: pd.DataFrame, successful_percent: float
+) -> PrettyTable:
     generic_output_table = PrettyTable()
 
     generic_output_table.field_names = [
@@ -92,7 +89,7 @@ def time_success_thoughput_table(df_sends, df_responses, successful_percent):
     return generic_output_table
 
 
-def latencies_table(df_sends, df_responses):
+def latencies_table(df_sends: pd.DataFrame, df_responses: pd.DataFrame) -> PrettyTable:
     ms_time_spent_sum = total_time_in_sec(df_sends, df_responses) * SEC_MS
     latency_output_table = PrettyTable()
     latency_output_table.field_names = [
@@ -118,7 +115,7 @@ def latencies_table(df_sends, df_responses):
     return latency_output_table
 
 
-def customize_table(fields_list, values_list: List[List]):
+def customize_table(fields_list: List[str], values_list: List[List]):
     custom_table = PrettyTable()
     custom_table.field_names = fields_list
     for val_row in values_list:
@@ -126,7 +123,7 @@ def customize_table(fields_list, values_list: List[List]):
     return custom_table
 
 
-def plot_latency_by_id(df_sends):
+def plot_latency_by_id(df_sends: pd.DataFrame) -> None:
     id_unit = [x for x in range(0, len(df_sends.index))]
     lat_unit = ms_latency_list
     plt.figure()
@@ -137,7 +134,7 @@ def plot_latency_by_id(df_sends):
     plt.figure(figsize=(15, 15), dpi=80)
 
 
-def plot_latency_across_time(df_responses):
+def plot_latency_across_time(df_responses) -> None:
     time_unit = [
         x - df_responses["receiveTime"][0] + 1 for x in df_responses["receiveTime"]
     ]
@@ -149,7 +146,7 @@ def plot_latency_across_time(df_responses):
     plt.figure(figsize=(15, 15), dpi=80)
 
 
-def plot_throughput_per_block(df_responses, time_block):
+def plot_throughput_per_block(df_responses: pd.DataFrame, time_block: float) -> None:
     """
     It splits the dataset in buckets of time_block seconds difference
     and will plot the throughput for each bucket
@@ -174,7 +171,7 @@ def plot_throughput_per_block(df_responses, time_block):
         )
     throughput_per_block = [
         x / time_block for x in req_per_block
-    ]  # x*10 because is 0.1s per input
+    ]  # x/time_block comes from rule of three
     plt.figure(3)
     plt.plot(block_latency, throughput_per_block)
     plt.ylabel("Throughput(req/s)")
@@ -182,12 +179,16 @@ def plot_throughput_per_block(df_responses, time_block):
     plt.savefig("throughput_across_time.png")
 
 
-def make_analysis(send_file, response_file):
+def get_df_from_parquet_file(input_file: str):
+    return pd.read_parquet(input_file, engine="fastparquet")
+
+
+def default_analysis(send_file, response_file):
     """
     Produce the analysis results
     """
-    df_sends = pd.read_parquet(send_file, engine="fastparquet")
-    df_responses = pd.read_parquet(response_file, engine="fastparquet")
+    df_sends = get_df_from_parquet_file(send_file)
+    df_responses = get_df_from_parquet_file(response_file)
 
     successful_percent = iter_for_success_and_latency(df_sends, df_responses)
 
@@ -204,37 +205,3 @@ def make_analysis(send_file, response_file):
     plot_throughput_per_block(df_responses, 0.1)
 
     print("\n", "".join(x), "Finished plotting", "".join(x))
-
-
-def main():
-    """
-    The function to receive the arguments
-    from the command line
-    """
-    arg_send_file = "../submitter/cpp_send.parquet"
-    arg_response_file = "../submitter/cpp_respond.parquet"
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-sf",
-        "--send_file",
-        help="Path to the parquet file that contains the submitted\
-            requests. Default location `../submitter/sends.parquet`",
-        type=str,
-    )
-    parser.add_argument(
-        "-rf",
-        "--response_file",
-        help="Path to the parquet file that contains the responses\
-            from the submitted requests. Default `../submitter/receives.parquet`",
-        type=str,
-    )
-
-    args = parser.parse_args()
-    make_analysis(
-        args.send_file or arg_send_file, args.response_file or arg_response_file
-    )
-
-
-if __name__ == "__main__":
-    main()
