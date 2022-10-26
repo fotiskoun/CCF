@@ -1,7 +1,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the Apache 2.0 License.
 
-import pandas as pd
 import analyzer as an
 
 df_sends = an.get_df_from_parquet_file("../submitter/cpp_send.parquet")

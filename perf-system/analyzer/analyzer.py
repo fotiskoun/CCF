@@ -9,8 +9,8 @@ import numpy as np
 import matplotlib.pyplot as plt  # type: ignore
 from typing import List
 
-latency_list = []
-ms_latency_list = []
+latency_list = []  # type: List[float]
+ms_latency_list = []  # type: List[float]
 SEC_MS = 1000
 
 
