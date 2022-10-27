@@ -47,7 +47,7 @@ For the **C++** submitter one of the main requirements is Apache Arrow and Parqu
 
 ```sh
 ./run.sh ccf-dev.yml
-``` 
+```
 
 After installing arrow you can build and run the submitter from the root CCF directory **CCF/build/**. If you haven't done before, create a build directory in `CCF` and then build and run using the following commands:
 

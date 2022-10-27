@@ -5,7 +5,6 @@ Submit requests
 """
 
 import asyncio
-import http
 import time
 import ssl
 import argparse
