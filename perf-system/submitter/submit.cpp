@@ -2,26 +2,18 @@
 // Licensed under the Apache 2.0 License.
 
 #include "ccf/crypto/verifier.h"
-#include "ccf/ds/logger.h"
 #include "ccf/service/node_info_network.h"
 #include "clients/rpc_tls_client.h"
 #include "ds/files.h"
 #include "handle_arguments.hpp"
 #include "parquet_data.hpp"
 
-#include <arrow/api.h>
 #include <arrow/array/array_binary.h>
 #include <arrow/filesystem/localfs.h>
 #include <arrow/io/file.h>
-#include <ctime>
-#include <iostream>
-#include <openssl/bio.h>
-#include <openssl/err.h>
-#include <openssl/pem.h>
-#include <openssl/ssl.h>
+// #include <iostream>
 #include <parquet/arrow/reader.h>
 #include <parquet/stream_writer.h>
-#include <vector>
 
 using namespace std;
 using namespace client;

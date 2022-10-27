@@ -3,8 +3,6 @@
 
 #include "handle_arguments.hpp"
 
-#include <iostream>
-
 ArgumentParser::ArgumentParser() {}
 
 void ArgumentParser::argument_assigner(int argc, char** argv)
