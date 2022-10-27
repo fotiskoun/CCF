@@ -45,7 +45,7 @@ def test_put_get(network, args):
         target=f"{primary.get_public_rpc_host()}:{primary.get_public_rpc_port()}",
         credentials=credentials,
     ) as channel:
-        put = KV.KVKeyValue()
+        put = KV.KVKeyValue()  # pylint: disable=maybe-no-member
         put.key = my_key.encode()
         put.value = my_value.encode()
         put.table = my_table.encode()
@@ -55,7 +55,7 @@ def test_put_get(network, args):
         stub.Put(put)
 
         LOG.info(f"Get key '{my_key}' in table '{my_table}'")
-        get = KV.KVKey()
+        get = KV.KVKey()  # pylint: disable=maybe-no-member
         get.key = my_key.encode()
         get.table = my_table.encode()
         r = stub.Get(get)
@@ -64,7 +64,7 @@ def test_put_get(network, args):
 
         unknown_key = "unknown_key"
         LOG.info(f"Get unknown key '{unknown_key}' in table '{my_table}'")
-        get = KV.KVKey()
+        get = KV.KVKey()  # pylint: disable=maybe-no-member
         get.key = unknown_key.encode()
         get.table = my_table.encode()
         try:
