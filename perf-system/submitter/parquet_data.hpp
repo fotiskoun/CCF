@@ -4,9 +4,6 @@
 #ifndef PARQUET_DATA_H
 #define PARQUET_DATA_H
 
-#include <iostream>
-#include <vector>
-
 class ParquetData
 {
 public:
