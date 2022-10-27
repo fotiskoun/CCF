@@ -703,13 +703,11 @@ endfunction()
 set(SUBMITTER_DIR ${CCF_DIR}/perf-system/submitter)
 
 add_executable(
-  submit 
-  ${SUBMITTER_DIR}/submit.cpp 
-  ${SUBMITTER_DIR}/handle_arguments.cpp 
-  ${SUBMITTER_DIR}/handle_arguments.hpp 
-  ${SUBMITTER_DIR}/stdcpp.h
+  submit
+  ${SUBMITTER_DIR}/submit.cpp ${SUBMITTER_DIR}/handle_arguments.cpp
+  ${SUBMITTER_DIR}/handle_arguments.hpp ${SUBMITTER_DIR}/stdcpp.h
   ${SUBMITTER_DIR}/parquet_data.hpp
-  )
+)
 
 add_library(stdcxxhttp_parser.host "${HTTP_PARSER_SOURCES}")
 
@@ -736,11 +734,15 @@ set(CCFCRYPTO_SRC
 add_library(stdcxxccfcrypto.host STATIC "${CCFCRYPTO_SRC}")
 target_link_libraries(stdcxxccfcrypto.host PUBLIC crypto)
 target_link_libraries(stdcxxccfcrypto.host PUBLIC ssl)
-  
+
 if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 9)
-target_link_libraries(submit PRIVATE stdcxxhttp_parser.host stdcxxccfcrypto.host arrow parquet)
+  target_link_libraries(
+    submit PRIVATE stdcxxhttp_parser.host stdcxxccfcrypto.host arrow parquet
+  )
 
 else()
-target_link_libraries(submit PRIVATE stdcxxhttp_parser.host stdcxxccfcrypto.host arrow parquet c++fs
+  target_link_libraries(
+    submit PRIVATE stdcxxhttp_parser.host stdcxxccfcrypto.host arrow parquet
+                   c++fs
   )
 endif()
