@@ -11,7 +11,6 @@
 #include <arrow/array/array_binary.h>
 #include <arrow/filesystem/localfs.h>
 #include <arrow/io/file.h>
-// #include <iostream>
 #include <parquet/arrow/reader.h>
 #include <parquet/stream_writer.h>
 
@@ -73,7 +72,12 @@ void readParquetFile(string generator_filename, ParquetData& data_handler)
   }
 }
 
-void writeResponseParquetFile(std::string filename, ParquetData& data_handler)
+parquet::StreamWriter initParquetColumns(
+  std::string filename,
+  ParquetData& data_handler,
+  std::vector<
+    std::tuple<std::string, parquet::Type::type, parquet::ConvertedType::type>>
+    columns)
 {
   std::shared_ptr<arrow::io::FileOutputStream> outfile;
 
@@ -83,73 +87,22 @@ void writeResponseParquetFile(std::string filename, ParquetData& data_handler)
 
   parquet::schema::NodeVector fields;
 
-  fields.push_back(parquet::schema::PrimitiveNode::Make(
-    "messageID",
-    parquet::Repetition::REQUIRED,
-    parquet::Type::BYTE_ARRAY,
-    parquet::ConvertedType::UTF8));
-
-  fields.push_back(parquet::schema::PrimitiveNode::Make(
-    "receiveTime",
-    parquet::Repetition::REQUIRED,
-    parquet::Type::DOUBLE,
-    parquet::ConvertedType::NONE));
-
-  fields.push_back(parquet::schema::PrimitiveNode::Make(
-    "rawResponse",
-    parquet::Repetition::OPTIONAL,
-    parquet::Type::BYTE_ARRAY,
-    parquet::ConvertedType::UTF8));
+  for (auto const& col : columns)
+  {
+    fields.push_back(parquet::schema::PrimitiveNode::Make(
+      std::get<0>(col),
+      parquet::Repetition::REQUIRED,
+      std::get<1>(col),
+      std::get<2>(col)));
+  }
 
   std::shared_ptr<parquet::schema::GroupNode> schema =
     std::static_pointer_cast<parquet::schema::GroupNode>(
       parquet::schema::GroupNode::Make(
         "schema", parquet::Repetition::REQUIRED, fields));
 
-  parquet::StreamWriter os{
+  return parquet::StreamWriter{
     parquet::ParquetFileWriter::Open(outfile, schema, builder.build())};
-
-  for (size_t i = 0; i < data_handler.RESPONSE_TIME.size(); i++)
-  {
-    os << to_string(i) << data_handler.RESPONSE_TIME[i]
-       << data_handler.RAW_RESPONSE[i] << parquet::EndRow;
-  }
-}
-
-void writeSendParquetFile(std::string filename, ParquetData& data_handler)
-{
-  std::shared_ptr<arrow::io::FileOutputStream> outfile;
-
-  PARQUET_ASSIGN_OR_THROW(outfile, arrow::io::FileOutputStream::Open(filename));
-
-  parquet::WriterProperties::Builder builder;
-
-  parquet::schema::NodeVector fields;
-
-  fields.push_back(parquet::schema::PrimitiveNode::Make(
-    "messageID",
-    parquet::Repetition::REQUIRED,
-    parquet::Type::BYTE_ARRAY,
-    parquet::ConvertedType::UTF8));
-
-  fields.push_back(parquet::schema::PrimitiveNode::Make(
-    "sendTime",
-    parquet::Repetition::REQUIRED,
-    parquet::Type::DOUBLE,
-    parquet::ConvertedType::NONE));
-
-  std::shared_ptr<parquet::schema::GroupNode> schema =
-    std::static_pointer_cast<parquet::schema::GroupNode>(
-      parquet::schema::GroupNode::Make(
-        "schema", parquet::Repetition::REQUIRED, fields));
-
-  parquet::StreamWriter os{
-    parquet::ParquetFileWriter::Open(outfile, schema, builder.build())};
-
-  for (size_t i = 0; i < data_handler.SEND_TIME.size(); i++)
-  {
-    os << to_string(i) << data_handler.SEND_TIME[i] << parquet::EndRow;
-  }
 }
 
 std::shared_ptr<RpcTlsClient> create_connection(
@@ -201,6 +154,50 @@ std::string get_response_string(client::HttpRpcTlsClient::Response resp)
 
   response_string += std::string(resp.body.begin(), resp.body.end());
   return response_string;
+}
+
+void storeParquetResults(ArgumentParser args, ParquetData data_handler)
+{
+  cout << "Start storing results" << endl;
+
+  // Initialize Send Columns
+  std::vector<
+    std::tuple<std::string, parquet::Type::type, parquet::ConvertedType::type>>
+    send_cols{
+      std::make_tuple(
+        "messageID", parquet::Type::BYTE_ARRAY, parquet::ConvertedType::UTF8),
+      std::make_tuple(
+        "sendTime", parquet::Type::DOUBLE, parquet::ConvertedType::NONE)};
+
+  // Initialize Response Columns
+  std::vector<
+    std::tuple<std::string, parquet::Type::type, parquet::ConvertedType::type>>
+    response_cols{
+      std::make_tuple(
+        "messageID", parquet::Type::BYTE_ARRAY, parquet::ConvertedType::UTF8),
+      std::make_tuple(
+        "receiveTime", parquet::Type::DOUBLE, parquet::ConvertedType::NONE),
+      std::make_tuple(
+        "rawResponse",
+        parquet::Type::BYTE_ARRAY,
+        parquet::ConvertedType::UTF8)};
+
+  // Write Send Parquet
+  auto os = initParquetColumns(args.send_filename, data_handler, send_cols);
+  for (size_t i = 0; i < data_handler.SEND_TIME.size(); i++)
+  {
+    os << to_string(i) << data_handler.SEND_TIME[i] << parquet::EndRow;
+  }
+
+  // Write Response Parquet
+  os = initParquetColumns(args.response_filename, data_handler, response_cols);
+  for (size_t i = 0; i < data_handler.RESPONSE_TIME.size(); i++)
+  {
+    os << to_string(i) << data_handler.RESPONSE_TIME[i]
+       << data_handler.RAW_RESPONSE[i] << parquet::EndRow;
+  }
+
+  cout << "Finished storing results" << endl;
 }
 
 int main(int argc, char** argv)
@@ -279,7 +276,9 @@ int main(int argc, char** argv)
       read_reqs++;
     }
   }
-  cout << "Finished subm" << endl;
+
+  std::cout << "Finished Request Submission" << endl;
+
   for (size_t req = 0; req < requests_size; req++)
   {
     data_handler.RAW_RESPONSE.push_back(get_response_string(resp[req]));
@@ -288,10 +287,6 @@ int main(int argc, char** argv)
     data_handler.SEND_TIME.push_back(send_time);
     data_handler.RESPONSE_TIME.push_back(response_time);
   }
-  std::cout << "Finished Request Submission" << endl;
 
-  cout << "Start storing results" << endl;
-  writeSendParquetFile(args.send_filename, data_handler);
-  writeResponseParquetFile(args.response_filename, data_handler);
-  cout << "Finished storing results" << endl;
+  storeParquetResults(args, data_handler);
 }
