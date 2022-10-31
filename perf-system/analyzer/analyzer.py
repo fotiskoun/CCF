@@ -64,7 +64,7 @@ def sec_to_ms(time_in_sec: float) -> float:
     return time_in_sec / SEC_MS
 
 
-def time_success_thoughput_table(
+def time_success_throughput_table(
     df_sends: pd.DataFrame, df_responses: pd.DataFrame, successful_percent: float
 ) -> PrettyTable:
     generic_output_table = PrettyTable()
@@ -174,7 +174,7 @@ def plot_throughput_per_block(df_responses: pd.DataFrame, time_block: float) -> 
     throughput_per_block = [
         x / time_block for x in req_per_block
     ]  # x/time_block comes from rule of three
-    plt.figure(3)
+    plt.figure()
     plt.plot(block_latency, throughput_per_block)
     plt.ylabel("Throughput(req/s)")
     plt.xlabel("time(ms)")
@@ -183,6 +183,65 @@ def plot_throughput_per_block(df_responses: pd.DataFrame, time_block: float) -> 
 
 def get_df_from_parquet_file(input_file: str):
     return pd.read_parquet(input_file, engine="fastparquet")
+
+
+def plot_latency_distribution(ms_separator: float, highest_vals=15):
+    """
+    Starting from 0 with ms_separator
+    step split the ms list in to buckets
+    and show the highest_vals top buckets
+    """
+    max_latency = max(ms_latency_list)
+    min_latency = min(ms_latency_list)
+
+    if max_latency < ms_separator:
+        print(
+            "I cannot print a latency distribution graph as all latencies are less than",
+            ms_separator,
+        )
+        return
+
+    bins_number = (
+        int(
+            (max_latency - min_latency) // ms_separator
+            + bool((max_latency - min_latency) % ms_separator)
+        )
+        + 1
+    )
+
+    counts = [0] * bins_number
+    bins = [min_latency]
+    bin_val = min_latency
+    for _ in range(bins_number):
+        bin_val += ms_separator
+        bins.append(bin_val)
+
+    for lat in ms_latency_list:
+        counts[
+            int(
+                (lat - min_latency) // ms_separator
+                + bool((lat - min_latency) % ms_separator)
+            )
+        ] += 1
+
+    top_bins = []
+    top_counts = []
+    min_count = sorted(counts)[-highest_vals]
+    for ind in range(len(counts)):
+        if counts[ind] >= min_count:
+            top_bins.append(round(bins[ind], 3))
+            top_counts.append(counts[ind])
+
+    x_axis = range(len(top_bins))
+    plt.figure()
+    fig, ax = plt.subplots()
+    ax.bar(x_axis, top_counts, 0.9, align="center")
+    ax.set_xticks(x_axis)
+    ax.set_xticklabels(top_bins, rotation=25)
+    plt.ylabel("Count")
+    plt.xlabel("Latency")
+    fig.subplots_adjust(bottom=0.2)
+    plt.savefig("latency_distribution.png")
 
 
 def default_analysis(send_file, response_file):
@@ -196,7 +255,7 @@ def default_analysis(send_file, response_file):
 
     print("The request type sent is ", get_req_type(df_responses))
 
-    print(time_success_thoughput_table(df_sends, df_responses, successful_percent))
+    print(time_success_throughput_table(df_sends, df_responses, successful_percent))
     print(latencies_table(df_sends, df_responses))
 
     x = ["-"] * 20

@@ -23,3 +23,5 @@ my_table = an.customize_table(col_names, rows)
 
 print(my_table)
 an.plot_throughput_per_block(df_responses, 0.1)
+
+an.plot_latency_distribution(0.1)
