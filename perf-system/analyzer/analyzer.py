@@ -187,9 +187,9 @@ def get_df_from_parquet_file(input_file: str):
 
 def plot_latency_distribution(ms_separator: float, highest_vals=15):
     """
-    Starting from 0 with ms_separator
-    step split the ms list in to buckets
-    and show the highest_vals top buckets
+    Starting from minimum latency with ms_separator
+    step split the ms latency list in buckets
+    and plots the highest_vals top buckets
     """
     max_latency = max(ms_latency_list)
     min_latency = min(ms_latency_list)
