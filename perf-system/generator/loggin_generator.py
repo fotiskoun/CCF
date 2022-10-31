@@ -6,10 +6,10 @@ MYHOST = "127.0.0.1:8000"
 REQUEST_CONTENT_TYPE = "content-type: application/json"
 
 
-for i in range(12):
+for i in range(25):
     req_type = "HTTP/1.1"
     req_path = "/app/log/private"
-    req_data = '{"id": 45, "msg": "Logged to private table"}'
+    req_data = '{"id": ' + str(1000) + ', "msg": "Logged to private table"}'
 
     create_verb(
         "post",
@@ -20,19 +20,19 @@ for i in range(12):
         headers=[REQUEST_CONTENT_TYPE],
     )
 
-for i in range(14):
+for i in range(300):
 
     req_type = "HTTP/1.1"
-    req_path = "/app/log/private?id=45"
+    req_path = "/app/log/private?id=" + str(i % 1000)
 
     create_verb("GET", MYHOST, req_path, req_type, headers=[REQUEST_CONTENT_TYPE])
 
-for i in range(14):
+for i in range(25):
 
     req_type = "HTTP/1.1"
-    req_path = "/app/log/private?id=45"
+    req_path = "/app/log/private?id=" + str(i % 1000)
 
     create_verb("delete", MYHOST, req_path, req_type, headers=[REQUEST_CONTENT_TYPE])
 
 
-create_parquet("new_raw.parquet")
+create_parquet("new_mid_raw.parquet")
