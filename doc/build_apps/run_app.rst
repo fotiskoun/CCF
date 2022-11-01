@@ -62,7 +62,7 @@ When establishing a TLS connection with a CCF service both the service and clien
 
 The service identity is created at startup. The initial node generates a fresh private key which exists solely within the service's enclaves. A certificate of the corresponding public key is emitted (``service_cert.pem``) and used by all subsequent connections to confirm they are communicating with the intended service.
 
-Each member and user is identified by the cert with which they were registered with the service, either at genesis or in a subsequent ``set_member`` or ``set_user`` governance proposal. Access to the corresponding private key allows a client to submit commands as this member or user. For this test network these are all freshly generated and stored in the same common workspace for easy access. In a real deployment only the certificates would be shared; the private keys would be distributed and remain confidential.
+Each member and user is identified by the cert with which they were registered with the service, either at genesis or in a subsequent ``set_member`` or ``set_user`` governance proposal. Access to the corresponding private key allows a client to submit commands as this member or user. For this test network these are all freshly generated and stored in the same common workspace for easy access. In a real deployment only certificates would be shared; private keys would be created by each participant, and remain confidential in their possession.
 
 When using curl the server's identity is provided by ``--cacert`` and the client identity by ``--cert`` and ``--key``. Resources under the ``/gov`` path require member identities, while those under ``/app`` typically require user identities.
 
@@ -173,9 +173,9 @@ The effects of transactions committed by the defunct network should then be reco
 Integration Tests
 -----------------
 
-The ``sandbox.sh`` script can be a helpful element of infrastructure to execute Integration Tests against a CCF test network running a particular application (see `test_install.sh <https://github.com/microsoft/CCF/blob/main/tests/test_install.sh>`_ script as example).
+The ``sandbox.sh`` script can be a helpful element of infrastructure to execute Integration Tests against a CCF test network running a particular application (see :ccf_repo:`test_install.sh </tests/test_install.sh>` script as example).
 
-``test_install.sh`` illustrates how to wait for the sandbox to be `ready <https://github.com/microsoft/CCF/blob/main/tests/test_install.sh#L33>`_ before issuing application transactions, how to shut it down cleanly, and how to trigger a recovery. Recovering a test network can be a useful way to inspect post-test application test.
+``test_install.sh`` illustrates how to wait for the sandbox to be :ccf_repo:`ready </tests/test_install.sh#L48>` before issuing application transactions, how to shut it down cleanly, and how to trigger a recovery. Recovering a test network can be a useful way to inspect post-test application test.
 
 Performance Tests
 -----------------

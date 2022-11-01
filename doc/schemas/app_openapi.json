@@ -1,6 +1,36 @@
 {
   "components": {
+    "responses": {
+      "default": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/CCFError"
+            }
+          }
+        },
+        "description": "An error occurred"
+      }
+    },
     "schemas": {
+      "CCFError": {
+        "properties": {
+          "error": {
+            "properties": {
+              "code": {
+                "description": "Response error code. CCF error codes: https://microsoft.github.io/CCF/main/operations/troubleshooting.html#error-codes",
+                "type": "string"
+              },
+              "message": {
+                "description": "Response error message",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
       "CodeStatus": {
         "enum": [
           "AllowedToJoin"
@@ -71,9 +101,6 @@
           "digest": {
             "$ref": "#/components/schemas/string"
           },
-          "platform": {
-            "$ref": "#/components/schemas/QuoteFormat"
-          },
           "status": {
             "$ref": "#/components/schemas/CodeStatus"
           }
@@ -98,6 +125,38 @@
         },
         "required": [
           "transaction_id"
+        ],
+        "type": "object"
+      },
+      "GetSnpHostDataMap__HostData": {
+        "properties": {
+          "metadata": {
+            "$ref": "#/components/schemas/string"
+          },
+          "raw": {
+            "$ref": "#/components/schemas/string"
+          }
+        },
+        "required": [
+          "raw",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "GetSnpHostDataMap__HostData_array": {
+        "items": {
+          "$ref": "#/components/schemas/GetSnpHostDataMap__HostData"
+        },
+        "type": "array"
+      },
+      "GetSnpHostDataMap__Out": {
+        "properties": {
+          "host_data": {
+            "$ref": "#/components/schemas/GetSnpHostDataMap__HostData_array"
+          }
+        },
+        "required": [
+          "host_data"
         ],
         "type": "object"
       },
@@ -181,6 +240,21 @@
         ],
         "type": "object"
       },
+      "LoggingPut__Out": {
+        "properties": {
+          "success": {
+            "$ref": "#/components/schemas/boolean"
+          },
+          "tx_id": {
+            "$ref": "#/components/schemas/string"
+          }
+        },
+        "required": [
+          "success",
+          "tx_id"
+        ],
+        "type": "object"
+      },
       "LoggingRecord__In": {
         "properties": {
           "id": {
@@ -198,14 +272,6 @@
           "msg"
         ],
         "type": "object"
-      },
-      "QuoteFormat": {
-        "enum": [
-          "OE_SGX_v1",
-          "Insecure_Virtual",
-          "AMD_SEV_SNP_v1"
-        ],
-        "type": "string"
       },
       "TransactionId": {
         "pattern": "^[0-9]+\\.[0-9]+$",
@@ -239,6 +305,11 @@
         "scheme": "bearer",
         "type": "http"
       },
+      "member_cose_sign1": {
+        "description": "Request payload must be a COSE Sign1 document, with expected protected headers.Signer must be a member identity registered with this service.",
+        "scheme": "cose_sign1",
+        "type": "http"
+      },
       "member_signature": {
         "description": "Request must be signed according to the HTTP Signature scheme. The signer must be a member identity registered with this service.",
         "scheme": "signature",
@@ -268,7 +339,7 @@
   "info": {
     "description": "This CCF sample app implements a simple logging application, securely recording messages at client-specified IDs. It demonstrates most of the features available to CCF apps.",
     "title": "CCF Sample Logging App",
-    "version": "1.10.2"
+    "version": "1.14.1"
   },
   "openapi": "3.0.0",
   "paths": {
@@ -284,6 +355,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "x-ccf-forwarding": {
@@ -303,6 +377,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "x-ccf-forwarding": {
@@ -322,6 +399,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "x-ccf-forwarding": {
@@ -341,6 +421,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "x-ccf-forwarding": {
@@ -360,6 +443,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "x-ccf-forwarding": {
@@ -389,10 +475,40 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "x-ccf-forwarding": {
           "$ref": "#/components/x-ccf-forwarding/sometimes"
+        }
+      }
+    },
+    "/app/log/cose_signed_content": {
+      "post": {
+        "responses": {
+          "200": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/string"
+                }
+              }
+            },
+            "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "member_cose_sign1": []
+          }
+        ],
+        "x-ccf-forwarding": {
+          "$ref": "#/components/x-ccf-forwarding/always"
         }
       }
     },
@@ -418,6 +534,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -450,6 +569,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -482,6 +604,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -516,6 +641,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -540,6 +668,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -574,6 +705,41 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "x-ccf-forwarding": {
+          "$ref": "#/components/x-ccf-forwarding/always"
+        }
+      }
+    },
+    "/app/log/private/anonymous/v2": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoggingRecord__In"
+              }
+            }
+          },
+          "description": "Auto-generated request body schema"
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoggingPut__Out"
+                }
+              }
+            },
+            "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "x-ccf-forwarding": {
@@ -593,6 +759,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -627,6 +796,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -669,6 +841,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -703,6 +878,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -737,6 +915,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -764,6 +945,9 @@
         "responses": {
           "200": {
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -798,6 +982,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -830,6 +1017,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -862,6 +1052,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -886,6 +1079,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -910,6 +1106,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -960,6 +1159,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -994,6 +1196,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -1018,6 +1223,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "x-ccf-forwarding": {
@@ -1037,6 +1245,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -1061,6 +1272,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -1102,6 +1316,63 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "x-ccf-forwarding": {
+          "$ref": "#/components/x-ccf-forwarding/sometimes"
+        }
+      }
+    },
+    "/app/snp/host_data": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "key",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetSnpHostDataMap__Out"
+                }
+              }
+            },
+            "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "x-ccf-forwarding": {
+          "$ref": "#/components/x-ccf-forwarding/sometimes"
+        }
+      }
+    },
+    "/app/snp/measurements": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetCode__Out"
+                }
+              }
+            },
+            "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "x-ccf-forwarding": {
@@ -1131,6 +1402,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "x-ccf-forwarding": {

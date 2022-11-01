@@ -80,104 +80,6 @@ namespace ccf
   class MemberEndpoints : public CommonEndpointRegistry
   {
   private:
-    bool set_js_app(kv::Tx& tx, const JsBundle& bundle)
-    {
-      std::string module_prefix = "/";
-      remove_modules(tx, module_prefix);
-      set_modules(tx, module_prefix, bundle.modules);
-
-      remove_endpoints(tx);
-
-      auto endpoints =
-        tx.rw<ccf::endpoints::EndpointsMap>(ccf::endpoints::Tables::ENDPOINTS);
-
-      for (auto& [url, endpoint] : bundle.metadata.endpoints)
-      {
-        for (auto& [method, info] : endpoint)
-        {
-          const std::string& js_module = info.js_module;
-          if (std::none_of(
-                bundle.modules.cbegin(),
-                bundle.modules.cend(),
-                [&js_module](const SetModule& item) {
-                  return item.name == js_module;
-                }))
-          {
-            LOG_FAIL_FMT(
-              "{} {}: module '{}' not found in bundle",
-              method,
-              url,
-              info.js_module);
-            return false;
-          }
-          auto info_ = info;
-          info_.js_module = module_prefix + info_.js_module;
-          auto verb = nlohmann::json(method).get<RESTVerb>();
-          endpoints->put(
-            ccf::endpoints::EndpointKey{
-              nonstd::starts_with(url, "/") ? url : fmt::format("/{}", url),
-              verb},
-            info_);
-        }
-      }
-
-      return true;
-    }
-
-    bool remove_js_app(kv::Tx& tx)
-    {
-      remove_modules(tx, "/");
-      remove_endpoints(tx);
-      return true;
-    }
-
-    void set_modules(
-      kv::Tx& tx, std::string prefix, const std::vector<SetModule>& modules)
-    {
-      for (auto& set_module_ : modules)
-      {
-        std::string full_name = prefix + set_module_.name;
-        if (!set_module(tx, full_name, set_module_.module))
-        {
-          throw std::logic_error(
-            fmt::format("Unexpected error while setting module {}", full_name));
-        }
-      }
-    }
-
-    bool set_module(kv::Tx& tx, std::string name, Module module)
-    {
-      if (name.empty() || name[0] != '/')
-      {
-        LOG_FAIL_FMT("module names must start with /");
-        return false;
-      }
-      auto tx_modules = tx.rw(network.modules);
-      tx_modules->put(name, module);
-      return true;
-    }
-
-    void remove_modules(kv::Tx& tx, std::string prefix)
-    {
-      auto tx_modules = tx.rw(network.modules);
-      tx_modules->foreach(
-        [&tx_modules, &prefix](const std::string& name, const Module&) {
-          if (nonstd::starts_with(name, prefix))
-          {
-            tx_modules->remove(name);
-          }
-          return true;
-        });
-    }
-
-    void remove_module(kv::Tx& tx, std::string name)
-    {
-      auto tx_modules = tx.rw(network.modules);
-      tx_modules->remove(name);
-    }
-
-    void remove_endpoints(kv::Tx& tx) {}
-
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wc99-extensions"
 
@@ -219,7 +121,7 @@ namespace ccf
       std::optional<ccf::jsgov::VoteFailures> vote_failures = std::nullopt;
       for (const auto& [mid, mb] : pi_->ballots)
       {
-        js::Runtime rt;
+        js::Runtime rt(&tx);
         js::Context context(rt, js::TxAccess::GOV_RO);
         rt.add_ccf_classdefs();
         js::TxContext txctx{&tx};
@@ -263,7 +165,7 @@ namespace ccf
       }
 
       {
-        js::Runtime rt;
+        js::Runtime rt(&tx);
         js::Context js_context(rt, js::TxAccess::GOV_RO);
         rt.add_ccf_classdefs();
         js::TxContext txctx{&tx};
@@ -368,7 +270,7 @@ namespace ccf
           }
           if (pi_.value().state == ProposalState::ACCEPTED)
           {
-            js::Runtime rt;
+            js::Runtime rt(&tx);
             js::Context js_context(rt, js::TxAccess::GOV_RW);
             rt.add_ccf_classdefs();
             js::TxContext txctx{&tx};
@@ -489,7 +391,7 @@ namespace ccf
       openapi_info.description =
         "This API is used to submit and query proposals which affect CCF's "
         "public governance tables.";
-      openapi_info.document_version = "2.8.1";
+      openapi_info.document_version = "2.9.8";
     }
 
     static std::optional<MemberId> get_caller_member_id(
@@ -896,11 +798,12 @@ namespace ccf
 
         auto validate_script = constitution.value();
 
-        js::Runtime rt;
+        js::Runtime rt(&ctx.tx);
         js::Context context(rt, js::TxAccess::GOV_RO);
         rt.add_ccf_classdefs();
+        js::TxContext txctx{&ctx.tx};
         js::populate_global(
-          nullptr,
+          &txctx,
           nullptr,
           nullptr,
           std::nullopt,
@@ -924,11 +827,14 @@ namespace ccf
 
         if (JS_IsException(val))
         {
-          js::js_dump_error(context);
+          auto [reason, trace] = js_error_message(context);
           ctx.rpc_ctx->set_error(
             HTTP_STATUS_INTERNAL_SERVER_ERROR,
             ccf::errors::InternalError,
-            "Failed to execute validation");
+            fmt::format(
+              "Failed to execute validation: {} {}",
+              reason,
+              trace.value_or("")));
           return;
         }
 
@@ -1018,6 +924,32 @@ namespace ccf
 
       make_endpoint("/proposals", HTTP_POST, post_proposals_js, member_sig_only)
         .set_auto_schema<jsgov::Proposal, jsgov::ProposalInfoSummary>()
+        .install();
+
+      using AllOpenProposals = std::map<ProposalId, jsgov::ProposalInfo>;
+      auto get_open_proposals_js =
+        [this](endpoints::ReadOnlyEndpointContext& ctx, nlohmann::json&&) {
+          auto proposal_info = ctx.tx.ro<ccf::jsgov::ProposalInfoMap>(
+            jsgov::Tables::PROPOSALS_INFO);
+          AllOpenProposals response;
+          proposal_info->foreach(
+            [&response](
+              const ProposalId& pid, const ccf::jsgov::ProposalInfo& pinfo) {
+              if (pinfo.state == ProposalState::OPEN)
+              {
+                response[pid] = pinfo;
+              }
+              return true;
+            });
+          return make_success(response);
+        };
+
+      make_read_only_endpoint(
+        "/proposals",
+        HTTP_GET,
+        json_read_only_adapter(get_open_proposals_js),
+        member_cert_or_sig)
+        .set_auto_schema<void, AllOpenProposals>()
         .install();
 
       auto get_proposal_js = [this](
@@ -1300,7 +1232,7 @@ namespace ccf
         auto params = nlohmann::json::parse(ctx.rpc_ctx->get_request_body());
 
         {
-          js::Runtime rt;
+          js::Runtime rt(&ctx.tx);
           js::Context context(rt, js::TxAccess::GOV_RO);
           auto ballot_func =
             context.function(params["ballot"], "vote", "body[\"ballot\"]");

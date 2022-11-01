@@ -257,7 +257,7 @@ def test_illegal(network, args):
 
 
 @reqs.description("Alternative protocols")
-@reqs.supports_methods("/app/log/private", "/app/log/public")
+@reqs.supports_methods("/log/private", "/log/public")
 @reqs.at_least_n_nodes(2)
 def test_protocols(network, args):
     primary, _ = network.find_primary()
@@ -353,7 +353,7 @@ def test_remove(network, args):
         _, log_id = network.txs.get_log_id(txid)
         network.txs.delete(log_id, priv=priv)
         r = network.txs.request(log_id, priv=priv)
-        if args.package in ["libjs_generic", "libjs_v8"]:
+        if args.package in ["libjs_generic"]:
             check(r, result={"error": "No such key"})
         else:
             check(
@@ -394,7 +394,7 @@ def test_clear(network, args):
                 )
                 for log_id in log_ids:
                     get_r = c.get(f"{resource}?id={log_id}")
-                    if args.package in ["libjs_generic", "libjs_v8"]:
+                    if args.package in ["libjs_generic"]:
                         check(
                             get_r,
                             result={"error": "No such key"},
@@ -1149,27 +1149,34 @@ def test_user_data_ACL(network, args):
 
     user = network.users[0]
 
-    # Give isAdmin permissions to a single user
-    network.consortium.set_user_data(
-        primary, user.service_id, user_data={"isAdmin": True}
-    )
+    def by_set_user_data(user_data):
+        network.consortium.set_user_data(primary, user.service_id, user_data=user_data)
 
-    log_id = network.txs.find_max_log_id() + 1
+    def by_set_user(user_data):
+        network.consortium.add_user(primary, user.local_id, user_data=user_data)
 
-    # Confirm that user can now use this endpoint
-    with primary.client(user.local_id) as c:
-        r = c.post("/app/log/private/admin_only", {"id": log_id, "msg": "hello world"})
-        assert r.status_code == http.HTTPStatus.OK.value, r.status_code
+    for set_user_data in (by_set_user_data, by_set_user):
+        # Give isAdmin permissions to a single user
+        set_user_data(user_data={"isAdmin": True})
 
-    # Remove permission
-    network.consortium.set_user_data(
-        primary, user.service_id, user_data={"isAdmin": False}
-    )
+        log_id = network.txs.find_max_log_id() + 1
 
-    # Confirm that user is now forbidden on this endpoint
-    with primary.client(user.local_id) as c:
-        r = c.post("/app/log/private/admin_only", {"id": log_id, "msg": "hello world"})
-        assert r.status_code == http.HTTPStatus.FORBIDDEN.value, r.status_code
+        # Confirm that user can now use this endpoint
+        with primary.client(user.local_id) as c:
+            r = c.post(
+                "/app/log/private/admin_only", {"id": log_id, "msg": "hello world"}
+            )
+            assert r.status_code == http.HTTPStatus.OK.value, r.status_code
+
+        # Remove permission
+        set_user_data(user_data={"isAdmin": False})
+
+        # Confirm that user is now forbidden on this endpoint
+        with primary.client(user.local_id) as c:
+            r = c.post(
+                "/app/log/private/admin_only", {"id": log_id, "msg": "hello world"}
+            )
+            assert r.status_code == http.HTTPStatus.FORBIDDEN.value, r.status_code
 
     return network
 
@@ -1457,6 +1464,16 @@ def test_rekey(network, args):
     return network
 
 
+@reqs.description("Test empty URI behaviour")
+def test_empty_path(network, args):
+    primary, _ = network.find_primary()
+    with primary.client() as c:
+        r = c.get("/")
+        assert r.status_code == http.HTTPStatus.NOT_FOUND
+        r = c.post("/")
+        assert r.status_code == http.HTTPStatus.NOT_FOUND
+
+
 @reqs.description("Test UDP echo endpoint")
 @reqs.at_least_n_nodes(1)
 def test_udp_echo(network, args):
@@ -1483,6 +1500,36 @@ def test_udp_echo(network, args):
         LOG.info(f"Testing UDP echo server received '{text}'")
         assert text == test_string
         attempt = attempt + 1
+
+
+@reqs.description("Check post-local-commit failure handling")
+@reqs.supports_methods("/app/log/private/anonymous/v2")
+def test_post_local_commit_failure(network, args):
+    primary, _ = network.find_primary()
+    with primary.client() as c:
+        r = c.post(
+            "/app/log/private/anonymous/v2?fail=false", {"id": 100, "msg": "hello"}
+        )
+        assert r.status_code == http.HTTPStatus.OK.value, r.status_code
+        assert r.body.json()["success"] == True
+        TxID.from_str(r.body.json()["tx_id"])
+
+        r = c.post(
+            "/app/log/private/anonymous/v2?fail=true", {"id": 101, "msg": "world"}
+        )
+        assert (
+            r.status_code == http.HTTPStatus.INTERNAL_SERVER_ERROR.value
+        ), r.status_code
+        txid_header_key = "x-ms-ccf-transaction-id"
+        # check we can parse the txid from the header
+        # this gets set since the post-commit handler threw
+        TxID.from_str(r.headers[txid_header_key])
+        assert r.body.json() == {
+            "error": {
+                "code": "InternalError",
+                "message": "Failed to execute local commit handler func: didn't set user_data!",
+            }
+        }, r.body.json()
 
 
 def run_udp_tests(args):
@@ -1550,6 +1597,8 @@ def run(args):
         test_historical_query_range(network, args)
         test_view_history(network, args)
         test_metrics(network, args)
+        test_empty_path(network, args)
+        test_post_local_commit_failure(network, args)
         # BFT does not handle re-keying yet
         if args.consensus == "CFT":
             test_liveness(network, args)
@@ -1559,9 +1608,8 @@ def run(args):
         if args.package == "samples/apps/logging/liblogging":
             test_receipts(network, args)
             test_historical_query_sparse(network, args)
-        if "v8" not in args.package:
-            test_historical_receipts(network, args)
-            test_historical_receipts_with_claims(network, args)
+        test_historical_receipts(network, args)
+        test_historical_receipts_with_claims(network, args)
 
 
 def run_parsing_errors(args):
@@ -1591,21 +1639,6 @@ if __name__ == "__main__":
         initial_user_count=4,
         initial_member_count=2,
     )
-
-    # Is there a better way to do this?
-    if os.path.exists(
-        os.path.join(cr.args.library_dir, "libjs_v8.virtual.so")
-    ) or os.path.exists(os.path.join(cr.args.library_dir, "libjs_v8.enclave.so")):
-        cr.add(
-            "js_v8",
-            run,
-            package="libjs_v8",
-            nodes=infra.e2e_args.max_nodes(cr.args, f=0),
-            initial_user_count=4,
-            initial_member_count=2,
-            election_timeout_ms=cr.args.election_timeout_ms
-            * 2,  # Larger election timeout as some large payloads may cause an election with v8
-        )
 
     cr.add(
         "cpp",

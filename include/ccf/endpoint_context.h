@@ -22,6 +22,8 @@ namespace ccf::endpoints
   // Commands are endpoints which do not interact with the kv, even to read
   struct CommandEndpointContext
   {
+    virtual ~CommandEndpointContext() = default;
+
     CommandEndpointContext(const std::shared_ptr<ccf::RpcContext>& r) :
       rpc_ctx(r)
     {}
@@ -59,6 +61,9 @@ namespace ccf::endpoints
     kv::Tx& tx;
   };
   using EndpointFunction = std::function<void(EndpointContext& args)>;
+
+  using LocallyCommittedEndpointFunction =
+    std::function<void(CommandEndpointContext& ctx, const ccf::TxID& txid)>;
 
   // Read-only endpoints can only get values from the kv, they cannot write
   struct ReadOnlyEndpointContext : public CommandEndpointContext

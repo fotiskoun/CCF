@@ -16,6 +16,8 @@ import infra.e2e_args
 import infra.crypto
 import suite.test_requirements as reqs
 import openapi_spec_validator
+from jwcrypto import jwk
+from cryptography.hazmat.primitives.asymmetric import ec
 
 from loguru import logger as LOG
 
@@ -37,29 +39,67 @@ def validate_openapi(client):
         raise e
 
 
+def generate_and_verify_jwk(client):
+    LOG.info("Generate JWK from raw public key PEM")
+    r = client.post("/app/pubPemToJwk", body={"pem": "invalid_pem"})
+    assert r.status_code != http.HTTPStatus.OK
+
+    # Elliptic curve
+    curves = [ec.SECP256R1, ec.SECP256K1, ec.SECP384R1]
+    for curve in curves:
+        priv_pem, pub_pem = infra.crypto.generate_ec_keypair(curve)
+        # Private
+        ref_priv_jwk = jwk.JWK.from_pem(priv_pem.encode()).export(as_dict=True)
+        r = client.post(
+            "/app/pemToJwk", body={"pem": priv_pem, "kid": ref_priv_jwk["kid"]}
+        )
+        body = r.body.json()
+        assert r.status_code == http.HTTPStatus.OK
+        assert body["kty"] == "EC"
+        assert body == ref_priv_jwk, f"{body} != {ref_priv_jwk}"
+
+        # Public
+        ref_pub_jwk = jwk.JWK.from_pem(pub_pem.encode()).export(as_dict=True)
+        r = client.post(
+            "/app/pubPemToJwk", body={"pem": pub_pem, "kid": ref_pub_jwk["kid"]}
+        )
+        body = r.body.json()
+        assert r.status_code == http.HTTPStatus.OK
+        assert body["kty"] == "EC"
+        assert body == ref_pub_jwk, f"{body} != {ref_pub_jwk}"
+
+    # RSA
+    key_sizes = [1024, 2048, 4096]
+    for key_size in key_sizes:
+        priv_pem, pub_pem = infra.crypto.generate_rsa_keypair(key_size)
+
+        # Private
+        ref_priv_jwk = jwk.JWK.from_pem(priv_pem.encode()).export(as_dict=True)
+        r = client.post(
+            "/app/rsaPemToJwk", body={"pem": priv_pem, "kid": ref_priv_jwk["kid"]}
+        )
+        body = r.body.json()
+        assert r.status_code == http.HTTPStatus.OK
+        assert body["kty"] == "RSA"
+        assert body == ref_priv_jwk, f"{body} != {ref_priv_jwk}"
+
+        # Public
+        ref_pub_jwk = jwk.JWK.from_pem(pub_pem.encode()).export(as_dict=True)
+        r = client.post(
+            "/app/pubRsaPemToJwk", body={"pem": pub_pem, "kid": ref_pub_jwk["kid"]}
+        )
+        body = r.body.json()
+        assert r.status_code == http.HTTPStatus.OK
+        assert body["kty"] == "RSA"
+        assert body == ref_pub_jwk, f"{body} != {ref_pub_jwk}"
+
+
 @reqs.description("Test module import")
 def test_module_import(network, args):
     primary, _ = network.find_nodes()
 
     # Update JS app, deploying modules _and_ app script that imports module
     bundle_dir = os.path.join(THIS_DIR, "basic-module-import")
-    network.consortium.set_js_app_from_dir(primary, bundle_dir)
-
-    with primary.client("user0") as c:
-        r = c.post("/app/test_module", {})
-        assert r.status_code == http.HTTPStatus.CREATED, r.status_code
-        assert r.body.text() == "Hello world!"
-
-    return network
-
-
-@reqs.description("Test dynamic module import")
-@reqs.installed_package("libjs_v8")
-def test_dynamic_module_import(network, args):
-    primary, _ = network.find_nodes()
-
-    # Update JS app, deploying modules _and_ app script that imports module
-    bundle_dir = os.path.join(THIS_DIR, "dynamic-module-import")
     network.consortium.set_js_app_from_dir(primary, bundle_dir)
 
     with primary.client("user0") as c:
@@ -136,6 +176,25 @@ def test_bytecode_cache(network, args):
         assert r.status_code == http.HTTPStatus.CREATED, r.status_code
         assert r.body.text() == "Hello world!"
 
+    return network
+
+
+@reqs.description("Test js runtime options")
+def test_set_js_runtime(network, args):
+    primary, _ = network.find_nodes()
+    # set js run time options
+    network.consortium.set_js_runtime_options(
+        primary, max_heap_bytes=50 * 1024 * 1024, max_stack_bytes=1024 * 512
+    )
+    with primary.client("user0") as c:
+        r = c.get("/node/js_metrics")
+        body = r.body.json()
+        assert body["max_heap_size"] == 50 * 1024 * 1024
+        assert body["max_stack_size"] == 1024 * 512
+    # reset the heap and stack sizes to default values
+    network.consortium.set_js_runtime_options(
+        primary, max_heap_bytes=100 * 1024 * 1024, max_stack_bytes=1024 * 1024
+    )
     return network
 
 
@@ -389,6 +448,30 @@ def test_npm_app(network, args):
             r.body.json()["privateKey"], r.body.json()["publicKey"]
         )
 
+        r = c.post("/app/generateEcdsaKeyPair", {"curve": "secp256r1"})
+        assert r.status_code == http.HTTPStatus.OK, r.status_code
+        assert infra.crypto.check_key_pair_pem(
+            r.body.json()["privateKey"], r.body.json()["publicKey"]
+        )
+
+        r = c.post("/app/generateEcdsaKeyPair", {"curve": "secp256k1"})
+        assert r.status_code == http.HTTPStatus.OK, r.status_code
+        assert infra.crypto.check_key_pair_pem(
+            r.body.json()["privateKey"], r.body.json()["publicKey"]
+        )
+
+        r = c.post("/app/generateEcdsaKeyPair", {"curve": "secp384r1"})
+        assert r.status_code == http.HTTPStatus.OK, r.status_code
+        assert infra.crypto.check_key_pair_pem(
+            r.body.json()["privateKey"], r.body.json()["publicKey"]
+        )
+
+        r = c.post("/app/generateEddsaKeyPair", {"curve": "curve25519"})
+        assert r.status_code == http.HTTPStatus.OK, r.status_code
+        assert infra.crypto.check_key_pair_pem(
+            r.body.json()["privateKey"], r.body.json()["publicKey"]
+        )
+
         aes_key_to_wrap = infra.crypto.generate_aes_key(256)
         wrapping_key_priv_pem, wrapping_key_pub_pem = infra.crypto.generate_rsa_keypair(
             2048
@@ -474,8 +557,26 @@ def test_npm_app(network, args):
         assert r.status_code == http.HTTPStatus.OK, r.status_code
         assert r.body.json() == False, r.body
 
-        key_priv_pem, key_pub_pem = infra.crypto.generate_ec_keypair("secp256r1")
-        algorithm = {"name": "ECDSA", "hash": "SHA-256"}
+        curves = [ec.SECP256R1, ec.SECP256K1]
+        for curve in curves:
+            key_priv_pem, key_pub_pem = infra.crypto.generate_ec_keypair(curve)
+            algorithm = {"name": "ECDSA", "hash": "SHA-256"}
+            data = "foo".encode()
+            signature = infra.crypto.sign(algorithm, key_priv_pem, data)
+            r = c.post(
+                "/app/verifySignature",
+                {
+                    "algorithm": algorithm,
+                    "key": key_pub_pem,
+                    "signature": b64encode(signature).decode(),
+                    "data": b64encode(data).decode(),
+                },
+            )
+            assert r.status_code == http.HTTPStatus.OK, r.status_code
+            assert r.body.json() == True, r.body
+
+        key_priv_pem, key_pub_pem = infra.crypto.generate_eddsa_keypair()
+        algorithm = {"name": "EdDSA"}
         data = "foo".encode()
         signature = infra.crypto.sign(algorithm, key_priv_pem, data)
         r = c.post(
@@ -592,10 +693,8 @@ def test_npm_app(network, args):
 
         r = c.get("/node/quotes/self")
         primary_quote_info = r.body.json()
-        if not primary_quote_info["raw"]:
-            LOG.info("Skipping /app/verifyOpenEnclaveEvidence test, virtual mode")
-        elif args.package == "libjs_v8":
-            LOG.info("Skipping /app/verifyOpenEnclaveEvidence test, V8")
+        if args.enclave_type not in ("release", "debug"):
+            LOG.info("Skipping /app/verifyOpenEnclaveEvidence test, non-sgx node")
         else:
             # See /opt/openenclave/include/openenclave/attestation/sgx/evidence.h
             OE_FORMAT_UUID_SGX_ECDSA = "a3a21e87-1b4d-4014-b70a-a125d2fbcd8c"
@@ -626,6 +725,7 @@ def test_npm_app(network, args):
             assert "sgx_report_data" in body["customClaims"], body
 
         validate_openapi(c)
+        generate_and_verify_jwk(c)
 
     LOG.info("Store JWT signing keys")
 
@@ -672,14 +772,11 @@ def run(args):
     ) as network:
         network.start_and_open(args)
         network = test_module_import(network, args)
-        network = test_dynamic_module_import(network, args)
         network = test_bytecode_cache(network, args)
         network = test_app_bundle(network, args)
         network = test_dynamic_endpoints(network, args)
-        if "v8" not in args.package:
-            # endpoint calls fail with "Cannot access \'logMap\' before init..."
-            # as if the const logMap wasn't preserved/captured
-            network = test_npm_app(network, args)
+        network = test_set_js_runtime(network, args)
+        network = test_npm_app(network, args)
 
 
 if __name__ == "__main__":

@@ -4,9 +4,11 @@
 
 #include "ccf/crypto/curve.h"
 #include "ccf/ds/unit_strings.h"
+#include "ccf/pal/attestation_sev_snp_endorsements.h"
 #include "ccf/service/consensus_config.h"
 #include "ccf/service/node_info_network.h"
 #include "ccf/service/service_config.h"
+#include "ccf/service/tables/host_data.h"
 #include "ccf/service/tables/members.h"
 
 #include <optional>
@@ -46,14 +48,20 @@ struct CCFConfig
     bool operator==(const JWT&) const = default;
   };
   JWT jwt = {};
+
+  struct Attestation
+  {
+    ccf::pal::snp::EndorsementsServers snp_endorsements_servers = {};
+
+    bool operator==(const Attestation&) const = default;
+  };
+  Attestation attestation = {};
 };
 
 struct StartupConfig : CCFConfig
 {
   // Only if joining or recovering
   std::vector<uint8_t> startup_snapshot = {};
-
-  std::optional<size_t> startup_snapshot_evidence_seqno_for_1_x = std::nullopt;
 
   std::string startup_host_time;
   size_t snapshot_tx_interval = 10'000;
@@ -63,6 +71,8 @@ struct StartupConfig : CCFConfig
   nlohmann::json service_data = nullptr;
 
   nlohmann::json node_data = nullptr;
+
+  std::optional<HostDataMetadata> security_policy;
 
   struct Start
   {

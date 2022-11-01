@@ -11,7 +11,6 @@ import os
 import shutil
 from loguru import logger as LOG
 
-
 DEFAULT_NODES = ["local://127.0.0.1:8000"]
 
 
@@ -106,10 +105,9 @@ def run(args):
             LOG.info("Started CCF network with the following nodes:")
             for node in nodes:
                 LOG.info(
-                    "  Node [{}] = https://{}:{}".format(
+                    "  Node [{}] = https://{}".format(
                         pad_node_id(node.local_node_id),
-                        node.get_public_rpc_host(),
-                        node.get_public_rpc_port(),
+                        node.get_public_rpc_address(),
                     )
                 )
 
@@ -126,12 +124,25 @@ def run(args):
             )
             LOG.warning("Press Ctrl+C to shutdown the network")
 
-            try:
-                while True:
-                    time.sleep(60)
+            if args.auto_shutdown:
+                if args.auto_shutdown_delay_s > 0:
+                    LOG.info(
+                        f"Waiting {args.auto_shutdown_delay_s}s before automatic shutdown..."
+                    )
+                    try:
+                        time.sleep(args.auto_shutdown_delay_s)
 
-            except KeyboardInterrupt:
-                LOG.info("Stopping all CCF nodes...")
+                    except KeyboardInterrupt:
+                        LOG.info("Stopping all CCF nodes...")
+
+                LOG.info("Automatically shut down network after successful opening")
+            else:
+                try:
+                    while True:
+                        time.sleep(60)
+
+                except KeyboardInterrupt:
+                    LOG.info("Stopping all CCF nodes...")
 
         LOG.info("All CCF nodes stopped.")
     except infra.network.NetworkShutdownError as e:
@@ -179,6 +190,18 @@ if __name__ == "__main__":
         parser.add_argument(
             "--common-dir",
             help="Directory containing previous network member identities",
+        )
+        parser.add_argument(
+            "--auto-shutdown",
+            help="If set, service automatically shuts down after successful opening",
+            action="store_true",
+            default=False,
+        )
+        parser.add_argument(
+            "--auto-shutdown-delay-s",
+            help="If --auto-shutdown is set, delay after which service automatically stops",
+            type=int,
+            default=0,
         )
 
     args = infra.e2e_args.cli_args(add)

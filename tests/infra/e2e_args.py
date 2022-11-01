@@ -233,6 +233,12 @@ def cli_args(add=lambda x: None, parser=None, accept_unknown=False):
         default=3,
     )
     parser.add_argument(
+        "--initial-operator-provisioner-count",
+        help="Number of additional members with is_operator_provisioner set in their member_data when initializing the network",
+        type=int,
+        default=0,
+    )
+    parser.add_argument(
         "--initial-operator-count",
         help="Number of additional members with is_operator set in their member_data when initializing the network",
         type=int,
@@ -368,6 +374,12 @@ def cli_args(add=lambda x: None, parser=None, accept_unknown=False):
         help="Enable HTTP/2 for all interfaces",
         action="store_true",
         default=False,
+    )
+    parser.add_argument(
+        "--snp-endorsements-servers",
+        help="Servers used to retrieve attestation report endorsement certificates (AMD SEV-SNP only)",
+        action="append",
+        default=[],
     )
 
     add(parser)

@@ -126,6 +126,7 @@ class Network:
         "ubsan_options",
         "previous_service_identity_file",
         "acme",
+        "snp_endorsements_servers",
     ]
 
     # Maximum delay (seconds) for updates to propagate from the primary to backups
@@ -245,7 +246,7 @@ class Network:
     ):
         # Contact primary if no target node is set
         primary, _ = self.find_primary(
-            timeout=args.ledger_recovery_timeout if recovery else 3
+            timeout=args.ledger_recovery_timeout if recovery else 10
         )
         target_node = target_node or primary
         LOG.info(f"Joining from target node {target_node.local_node_id}")
@@ -286,9 +287,7 @@ class Network:
             workspace=args.workspace,
             label=args.label,
             common_dir=self.common_dir,
-            target_rpc_address=infra.interfaces.make_address(
-                target_node.get_public_rpc_host(), target_node.get_public_rpc_port()
-            ),
+            target_rpc_address=target_node.get_public_rpc_address(),
             snapshots_dir=snapshots_dir,
             read_only_snapshots_dir=read_only_snapshots_dir,
             ledger_dir=current_ledger_dir,
@@ -390,7 +389,7 @@ class Network:
         # Here, recovery nodes might still be catching up, and possibly swamp
         # the current primary which would not be able to serve user requests
         primary, _ = self.find_primary(
-            timeout=args.ledger_recovery_timeout if recovery else 3
+            timeout=args.ledger_recovery_timeout if recovery else 10
         )
         return primary
 
@@ -430,15 +429,25 @@ class Network:
         self._setup_common_folder(args.constitution)
 
         mc = max(1, args.initial_member_count)
+        assert (
+            mc >= args.initial_operator_provisioner_count + args.initial_operator_count
+        ), f"Not enough members ({mc}) for the set amount of operator provisioners and operators"
+
         initial_members_info = []
         for i in range(mc):
+            member_data = None
+            if i < args.initial_operator_provisioner_count:
+                member_data = {"is_operator_provisioner": True}
+            elif (
+                i
+                < args.initial_operator_provisioner_count + args.initial_operator_count
+            ):
+                member_data = {"is_operator": True}
             initial_members_info += [
                 (
                     i,
                     (i < args.initial_recovery_member_count),
-                    {"is_operator": True}
-                    if (i < args.initial_operator_count)
-                    else None,
+                    member_data,
                 )
             ]
 
@@ -891,20 +900,24 @@ class Network:
 
     def _wait_for_app_open(self, node, timeout=3):
         end_time = time.time() + timeout
+        logs = []
         while time.time() < end_time:
             # As an operator, query a well-known /app endpoint to find out
             # if the app has been opened to users
             with node.client() as c:
-                r = c.get("/app/commit")
+                logs = []
+                r = c.get("/app/commit", log_capture=logs)
                 if not (r.status_code == http.HTTPStatus.NOT_FOUND.value):
+                    flush_info(logs, None)
                     return
                 time.sleep(0.1)
+        flush_info(logs, None)
         raise TimeoutError(f"Application frontend was not open after {timeout}s")
 
     def _get_node_by_service_id(self, node_id):
         return next((node for node in self.nodes if node.node_id == node_id), None)
 
-    def find_primary(self, nodes=None, timeout=3, log_capture=None, **kwargs):
+    def find_primary(self, nodes=None, timeout=10, log_capture=None, **kwargs):
         """
         Find the identity of the primary in the network and return its identity
         and the current view.
@@ -1246,10 +1259,10 @@ class Network:
                 return True
 
             LOG.info(
-                f"Waiting for a snapshot to be committed including seqno {target_seqno}"
+                f"Waiting for a snapshot to be committed including seqno {target_seqno} in {src_dir}"
             )
             end_time = time.time() + timeout
-            while time.time() < end_time:
+            while True:
                 for f in list_src_dir_func(src_dir):
                     snapshot_seqno = infra.node.get_snapshot_seqnos(f)[1]
                     if snapshot_seqno >= target_seqno and infra.node.is_file_committed(
@@ -1260,6 +1273,12 @@ class Network:
                         )
                         return True
 
+                if time.time() > end_time:
+                    LOG.error(
+                        f"Could not find committed snapshot for seqno {target_seqno} after {timeout:.2f}s in {src_dir}: {list_src_dir_func(src_dir)}"
+                    )
+                    return False
+
                 with node.client(self.consortium.get_any_active_member().local_id) as c:
                     logs = []
                     for _ in range(self.args.snapshot_tx_interval // 2):
@@ -1269,10 +1288,6 @@ class Network:
                         ), f"Error ack/update_state_digest: {r}"
                     c.wait_for_commit(r)
                 time.sleep(0.1)
-            LOG.error(
-                f"Could not find committed snapshot for seqno {target_seqno} after {timeout:.2f}s in {src_dir}: {list_src_dir_func(src_dir)}"
-            )
-            return False
 
         return node.get_committed_snapshots(wait_for_snapshots_to_be_committed)
 
@@ -1306,9 +1321,12 @@ class Network:
         )
 
     @functools.cached_property
+    def cert_path(self):
+        return os.path.join(self.common_dir, "service_cert.pem")
+
+    @functools.cached_property
     def cert(self):
-        cert_path = os.path.join(self.common_dir, "service_cert.pem")
-        with open(cert_path, encoding="utf-8") as c:
+        with open(self.cert_path, encoding="utf-8") as c:
             service_cert = load_pem_x509_certificate(
                 c.read().encode("ascii"), default_backend()
             )
@@ -1368,6 +1386,14 @@ class Network:
             f.write(current_ident)
         args.previous_service_identity_file = previous_identity
         return args
+
+    def identity(self, name=None):
+        if name is not None:
+            return infra.clients.Identity(
+                os.path.join(self.common_dir, f"{name}_privk.pem"),
+                os.path.join(self.common_dir, f"{name}_cert.pem"),
+                name,
+            )
 
 
 @contextmanager

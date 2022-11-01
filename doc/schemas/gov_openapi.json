@@ -1,5 +1,17 @@
 {
   "components": {
+    "responses": {
+      "default": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/CCFError"
+            }
+          }
+        },
+        "description": "An error occurred"
+      }
+    },
     "schemas": {
       "Action": {
         "properties": {
@@ -31,6 +43,24 @@
         "required": [
           "ballot"
         ],
+        "type": "object"
+      },
+      "CCFError": {
+        "properties": {
+          "error": {
+            "properties": {
+              "code": {
+                "description": "Response error code. CCF error codes: https://microsoft.github.io/CCF/main/operations/troubleshooting.html#error-codes",
+                "type": "string"
+              },
+              "message": {
+                "description": "Response error message",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
         "type": "object"
       },
       "CodeStatus": {
@@ -140,9 +170,6 @@
           "digest": {
             "$ref": "#/components/schemas/string"
           },
-          "platform": {
-            "$ref": "#/components/schemas/QuoteFormat"
-          },
           "status": {
             "$ref": "#/components/schemas/CodeStatus"
           }
@@ -178,6 +205,38 @@
         },
         "required": [
           "encrypted_share"
+        ],
+        "type": "object"
+      },
+      "GetSnpHostDataMap__HostData": {
+        "properties": {
+          "metadata": {
+            "$ref": "#/components/schemas/string"
+          },
+          "raw": {
+            "$ref": "#/components/schemas/string"
+          }
+        },
+        "required": [
+          "raw",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "GetSnpHostDataMap__HostData_array": {
+        "items": {
+          "$ref": "#/components/schemas/GetSnpHostDataMap__HostData"
+        },
+        "type": "array"
+      },
+      "GetSnpHostDataMap__Out": {
+        "properties": {
+          "host_data": {
+            "$ref": "#/components/schemas/GetSnpHostDataMap__HostData_array"
+          }
+        },
+        "required": [
+          "host_data"
         ],
         "type": "object"
       },
@@ -332,14 +391,6 @@
         ],
         "type": "string"
       },
-      "QuoteFormat": {
-        "enum": [
-          "OE_SGX_v1",
-          "Insecure_Virtual",
-          "AMD_SEV_SNP_v1"
-        ],
-        "type": "string"
-      },
       "StateDigest": {
         "properties": {
           "state_digest": {
@@ -399,6 +450,12 @@
         },
         "type": "object"
       },
+      "string_to_ProposalInfo": {
+        "additionalProperties": {
+          "$ref": "#/components/schemas/ProposalInfo"
+        },
+        "type": "object"
+      },
       "uint64": {
         "maximum": 18446744073709551615,
         "minimum": 0,
@@ -430,7 +487,7 @@
   "info": {
     "description": "This API is used to submit and query proposals which affect CCF's public governance tables.",
     "title": "CCF Governance API",
-    "version": "2.8.1"
+    "version": "2.9.8"
   },
   "openapi": "3.0.0",
   "paths": {
@@ -449,6 +506,9 @@
         "responses": {
           "204": {
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -473,6 +533,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -497,6 +560,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "x-ccf-forwarding": {
@@ -516,6 +582,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "x-ccf-forwarding": {
@@ -535,6 +604,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "x-ccf-forwarding": {
@@ -554,6 +626,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "x-ccf-forwarding": {
@@ -573,6 +648,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "x-ccf-forwarding": {
@@ -602,6 +680,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "x-ccf-forwarding": {
@@ -621,6 +702,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "x-ccf-forwarding": {
@@ -629,6 +713,31 @@
       }
     },
     "/gov/proposals": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/string_to_ProposalInfo"
+                }
+              }
+            },
+            "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "member_signature": []
+          }
+        ],
+        "x-ccf-forwarding": {
+          "$ref": "#/components/x-ccf-forwarding/sometimes"
+        }
+      },
       "post": {
         "requestBody": {
           "content": {
@@ -650,6 +759,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -674,6 +786,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -708,6 +823,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -762,6 +880,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -786,6 +907,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -838,6 +962,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -872,6 +999,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "x-ccf-forwarding": {
@@ -891,6 +1021,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -923,6 +1056,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "security": [
@@ -932,6 +1068,60 @@
         ],
         "x-ccf-forwarding": {
           "$ref": "#/components/x-ccf-forwarding/always"
+        }
+      }
+    },
+    "/gov/snp/host_data": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "key",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetSnpHostDataMap__Out"
+                }
+              }
+            },
+            "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "x-ccf-forwarding": {
+          "$ref": "#/components/x-ccf-forwarding/sometimes"
+        }
+      }
+    },
+    "/gov/snp/measurements": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetCode__Out"
+                }
+              }
+            },
+            "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "x-ccf-forwarding": {
+          "$ref": "#/components/x-ccf-forwarding/sometimes"
         }
       }
     },
@@ -957,6 +1147,9 @@
               }
             },
             "description": "Default response description"
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
           }
         },
         "x-ccf-forwarding": {

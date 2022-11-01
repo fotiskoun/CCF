@@ -299,13 +299,19 @@ class CurlClient:
     """
 
     def __init__(
-        self, host, port, ca=None, session_auth=None, signing_auth=None, **kwargs
+        self,
+        hostname,
+        ca=None,
+        session_auth=None,
+        signing_auth=None,
+        common_headers=None,
+        **kwargs,
     ):
-        self.host = host
-        self.port = port
+        self.hostname = hostname
         self.ca = ca
         self.session_auth = session_auth
         self.signing_auth = signing_auth
+        self.common_headers = common_headers or {}
         self.ca_curve = get_curve(self.ca)
         self.protocol = kwargs.get("protocol") if "protocol" in kwargs else "https"
         self.extra_args = []
@@ -323,7 +329,7 @@ class CurlClient:
             else:
                 cmd = ["curl"]
 
-            url = f"{self.protocol}://{self.host}:{self.port}{request.path}"
+            url = f"{self.protocol}://{self.hostname}{request.path}"
 
             cmd += [url, "-X", request.http_verb, "-i", f"-m {timeout}"]
 
@@ -360,6 +366,9 @@ class CurlClient:
             for k, v in request.headers.items():
                 cmd.extend(["-H", f"{k}: {v}"])
 
+            for k, v in self.common_headers.items():
+                cmd.extend(["-H", f"{k}: {v}"])
+
             if self.ca:
                 cmd.extend(["--cacert", self.ca])
             if self.session_auth:
@@ -394,26 +403,32 @@ class CurlClient:
     def close(self):
         pass
 
+    @staticmethod
+    def extra_headers_count():
+        # curl inserts the following headers in every request
+        #  host: <address>
+        #  user-agent: curl/<version>
+        #  accept: */*
+        return 3
 
-class RequestClient:
+
+class HttpxClient:
     """
-    CCF default client and wrapper around Python Requests, handling HTTP signatures.
+    CCF default client and wrapper around Python httpx, handling HTTP signatures.
     """
 
     _auth_provider = HttpSig
 
     def __init__(
         self,
-        host: str,
-        port: int,
+        hostname: str,
         ca: str,
         session_auth: Optional[Identity] = None,
         signing_auth: Optional[Identity] = None,
         common_headers: Optional[dict] = None,
         **kwargs,
     ):
-        self.host = host
-        self.port = port
+        self.hostname = hostname
         self.ca = ca
         self.session_auth = session_auth
         self.signing_auth = signing_auth
@@ -491,14 +506,14 @@ class RequestClient:
         try:
             response = self.session.request(
                 request.http_verb,
-                url=f"{self.protocol}://{self.host}:{self.port}{request.path}",
+                url=f"{self.protocol}://{self.hostname}{request.path}",
                 auth=auth,
                 headers=extra_headers,
                 follow_redirects=request.allow_redirects,
                 timeout=timeout,
                 content=request_body,
             )
-        except httpx.ReadTimeout as exc:
+        except httpx.TimeoutException as exc:
             raise TimeoutError from exc
         except httpx.NetworkError as exc:
             raise CCFConnectionException from exc
@@ -511,6 +526,16 @@ class RequestClient:
 
     def close(self):
         self.session.close()
+
+    @staticmethod
+    def extra_headers_count():
+        # httpx inserts the following headers in every request
+        #  host: <address>
+        #  accept: */*
+        #  accept-encoding: gzip, deflate, br
+        #  connection: keep-alive
+        #  user-agent: python-httpx/<version>
+        return 5
 
 
 class CCFClient:
@@ -535,7 +560,9 @@ class CCFClient:
     A :py:exc:`CCFConnectionException` exception is raised if the connection is not established successfully within ``connection_timeout`` seconds.
     """
 
-    client_impl: Union[CurlClient, RequestClient]
+    default_impl_type: Union[CurlClient, HttpxClient] = (
+        CurlClient if os.getenv("CURL_CLIENT") else HttpxClient
+    )
 
     def __init__(
         self,
@@ -551,21 +578,21 @@ class CCFClient:
         **kwargs,
     ):
         self.connection_timeout = connection_timeout
-        self.hostname = f"{host}:{port}"
+        self.hostname = infra.interfaces.make_address(host, port)
         self.name = f"[{self.hostname}]"
         self.description = description or self.name
         self.is_connected = False
         self.auth = bool(session_auth)
         self.sign = bool(signing_auth)
 
-        if curl or os.getenv("CURL_CLIENT"):
-            self.client_impl = CurlClient(
-                host, port, ca, session_auth, signing_auth, **kwargs
-            )
-        else:
-            self.client_impl = RequestClient(
-                host, port, ca, session_auth, signing_auth, common_headers, **kwargs
-            )
+        impl_type = CCFClient.default_impl_type
+
+        if curl:
+            impl_type = CurlClient
+
+        self.client_impl = impl_type(
+            self.hostname, ca, session_auth, signing_auth, common_headers, **kwargs
+        )
 
     def _response(self, response: Response) -> Response:
         LOG.info(response)

@@ -20,6 +20,8 @@ from infra.runner import ConcurrentRunner
 import governance_history
 import tempfile
 import infra.interfaces
+import signing
+import infra.log_capture
 
 from loguru import logger as LOG
 
@@ -542,6 +544,23 @@ def test_service_cert_renewal_extended(network, args):
     return network
 
 
+@reqs.description("Binding proposal to service identity")
+def test_binding_proposal_to_service_identity(network, args):
+    primary, _ = network.find_primary()
+    network.consortium.assert_service_identity(primary, network.cert_path)
+    created = True
+    try:
+        network.consortium.assert_service_identity(primary, network.users[0].cert_path)
+    except infra.proposal.ProposalNotCreated as pe:
+        assert (
+            pe.response.status_code == 400
+            and pe.response.body.json()["error"]["code"] == "ProposalFailedToValidate"
+        ), pe.response.body.text()
+        created = False
+    assert not created
+    return network
+
+
 @reqs.description("Update certificates of all nodes at once")
 def test_all_nodes_cert_renewal(network, args, valid_from=None):
     primary, _ = network.find_primary()
@@ -575,6 +594,41 @@ def test_all_nodes_cert_renewal(network, args, valid_from=None):
             ), f"Self-signed node certificate for node {node.local_node_id} was not renewed"
 
 
+@reqs.description("Test COSE Sign1 auth")
+def test_cose_auth(network, args):
+    primary, _ = network.find_primary()
+    identity = network.identity("member0")
+    signed_statement = signing.create_cose_sign1(
+        b"body",
+        open(identity.key, encoding="utf-8").read(),
+        open(identity.cert, encoding="utf-8").read(),
+        {"ccf.gov.msg.type": "proposal"},
+    )
+    with primary.client() as c:
+        r = c.post(
+            "/log/cose_signed_content",
+            body=signed_statement,
+            headers={"content-type": "application/cose"},
+        )
+        assert r.status_code == 200
+        assert r.body.text() == "body", r.body.text
+
+    identity = network.identity("user0")
+    signed_statement = signing.create_cose_sign1(
+        b"body",
+        open(identity.key, encoding="utf-8").read(),
+        open(identity.cert, encoding="utf-8").read(),
+        {},
+    )
+    with primary.client() as c:
+        r = c.post(
+            "/log/cose_signed_content",
+            body=signed_statement,
+            headers={"content-type": "application/cose"},
+        )
+        assert r.status_code == 401
+
+
 def gov(args):
     for node in args.nodes:
         node.rpc_interfaces.update(infra.interfaces.make_secondary_interface())
@@ -596,9 +650,11 @@ def gov(args):
         test_ack_state_digest_update(network, args)
         test_invalid_client_signature(network, args)
         test_each_node_cert_renewal(network, args)
+        test_binding_proposal_to_service_identity(network, args)
         test_all_nodes_cert_renewal(network, args)
         test_service_cert_renewal(network, args)
         test_service_cert_renewal_extended(network, args)
+        test_cose_auth(network, args)
 
 
 def js_gov(args):
@@ -606,6 +662,7 @@ def js_gov(args):
         args.nodes, args.binary_dir, args.debug_nodes, args.perf_nodes, pdb=args.pdb
     ) as network:
         network.start_and_open(args)
+        governance_js.test_all_open_proposals(network, args)
         governance_js.test_proposal_validation(network, args)
         governance_js.test_proposal_storage(network, args)
         governance_js.test_proposal_withdrawal(network, args)
@@ -614,6 +671,7 @@ def js_gov(args):
         governance_js.test_proposals_with_votes(network, args)
         governance_js.test_vote_failure_reporting(network, args)
         governance_js.test_operator_proposals_and_votes(network, args)
+        governance_js.test_operator_provisioner_proposals_and_votes(network, args)
         governance_js.test_apply(network, args)
         governance_js.test_set_constitution(network, args)
 
@@ -628,6 +686,8 @@ if __name__ == "__main__":
         )
 
     cr = ConcurrentRunner(add)
+
+    infra.log_capture.COLORS = False
 
     cr.add(
         "session_auth",

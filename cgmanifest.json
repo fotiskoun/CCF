@@ -96,7 +96,7 @@
         "type": "git",
         "git": {
           "repositoryUrl": "https://github.com/microsoft/merklecpp",
-          "commitHash": "5b2be3862f29f13412bffa5f210658adbf0456e2"
+          "commitHash": "2f3853db4b043b2df00869043c34cc1608bdad87"
         }
       }
     },
@@ -114,16 +114,7 @@
         "type": "git",
         "git": {
           "repositoryUrl": "https://github.com/nghttp2/nghttp2",
-          "commitHash": "b5c4ba83222606b145e6a49c63d7ea53019f65e6"
-        }
-      }
-    },
-    {
-      "component": {
-        "type": "git",
-        "git": {
-          "repositoryUrl": "https://github.com/v8/v8",
-          "commitHash": "f7528051b26ebd074f5695e7c412e1fc30f514c6"
+          "commitHash": "08676d23f964ac9aa1f9317ad30f0b7d78eb5a5a"
         }
       }
     },
@@ -142,6 +133,24 @@
         "git": {
           "repositoryUrl": "https://github.com/protocolbuffers/protobuf",
           "commitHash": "ab840345966d0fa8e7100d771c92a73bfbadd25c"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/laurencelundblade/QCBOR",
+          "commitHash": "07653df2bbdb2d090d98d0df514fa019ac23dff3"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/laurencelundblade/t_cose",
+          "commitHash": "d5ff4e282d8af34e5756627cf877ab399e7e51af"
         }
       }
     }

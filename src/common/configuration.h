@@ -70,6 +70,9 @@ DECLARE_JSON_TYPE_WITH_OPTIONAL_FIELDS(CCFConfig::JWT);
 DECLARE_JSON_REQUIRED_FIELDS(CCFConfig::JWT);
 DECLARE_JSON_OPTIONAL_FIELDS(CCFConfig::JWT, key_refresh_interval);
 
+DECLARE_JSON_TYPE(CCFConfig::Attestation);
+DECLARE_JSON_REQUIRED_FIELDS(CCFConfig::Attestation, snp_endorsements_servers);
+
 DECLARE_JSON_TYPE_WITH_OPTIONAL_FIELDS(CCFConfig);
 DECLARE_JSON_REQUIRED_FIELDS(CCFConfig, network);
 DECLARE_JSON_OPTIONAL_FIELDS(
@@ -78,7 +81,8 @@ DECLARE_JSON_OPTIONAL_FIELDS(
   node_certificate,
   consensus,
   ledger_signatures,
-  jwt);
+  jwt,
+  attestation);
 
 DECLARE_JSON_TYPE(StartupConfig::Start);
 DECLARE_JSON_REQUIRED_FIELDS(
@@ -91,7 +95,7 @@ DECLARE_JSON_REQUIRED_FIELDS(
 DECLARE_JSON_TYPE(StartupConfig::Recover);
 DECLARE_JSON_REQUIRED_FIELDS(StartupConfig::Recover, previous_service_identity);
 
-DECLARE_JSON_TYPE_WITH_BASE_AND_OPTIONAL_FIELDS(StartupConfig, CCFConfig);
+DECLARE_JSON_TYPE_WITH_BASE(StartupConfig, CCFConfig);
 DECLARE_JSON_REQUIRED_FIELDS(
   StartupConfig,
   startup_snapshot,
@@ -100,8 +104,7 @@ DECLARE_JSON_REQUIRED_FIELDS(
   initial_service_certificate_validity_days,
   service_data,
   node_data,
+  security_policy,
   start,
   join,
   recover);
-DECLARE_JSON_OPTIONAL_FIELDS(
-  StartupConfig, startup_snapshot_evidence_seqno_for_1_x);

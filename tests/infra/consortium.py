@@ -271,7 +271,7 @@ class Consortium:
         )
 
     def vote_using_majority(
-        self, remote_node, proposal, ballot, wait_for_commit=True, timeout=3
+        self, remote_node, proposal, ballot, wait_for_commit=True, timeout=5
     ):
         response = None
 
@@ -473,6 +473,14 @@ class Consortium:
         proposal = self.get_any_active_member().propose(remote_node, proposal_body)
         return self.vote_using_majority(remote_node, proposal, careful_vote)
 
+    def assert_service_identity(self, remote_node, service_cert_path):
+        service_cert_pem = slurp_file(service_cert_path)
+        proposal_body, careful_vote = self.make_proposal(
+            "assert_service_identity", service_identity=service_cert_pem
+        )
+        proposal = self.get_any_active_member().propose(remote_node, proposal_body)
+        return self.vote_using_majority(remote_node, proposal, careful_vote)
+
     def set_js_app_from_dir(
         self, remote_node, bundle_path, disable_bytecode_cache=False
     ):
@@ -519,6 +527,15 @@ class Consortium:
         proposal = self.get_any_active_member().propose(remote_node, proposal_body)
         # Large apps take a long time to process - wait longer than normal for commit
         return self.vote_using_majority(remote_node, proposal, careful_vote, timeout=30)
+
+    def set_js_runtime_options(self, remote_node, max_heap_bytes, max_stack_bytes):
+        proposal_body, careful_vote = self.make_proposal(
+            "set_js_runtime_options",
+            max_heap_bytes=max_heap_bytes,
+            max_stack_bytes=max_stack_bytes,
+        )
+        proposal = self.get_any_active_member().propose(remote_node, proposal_body)
+        return self.vote_using_majority(remote_node, proposal, careful_vote)
 
     def remove_js_app(self, remote_node):
         proposal_body, careful_vote = self.make_proposal("remove_js_app")
@@ -659,9 +676,45 @@ class Consortium:
         proposal = self.get_any_active_member().propose(remote_node, proposal_body)
         return self.vote_using_majority(remote_node, proposal, careful_vote)
 
+    def add_snp_measurement(self, remote_node, measurement):
+        proposal_body, careful_vote = self.make_proposal(
+            "add_snp_measurement", measurement=measurement
+        )
+        proposal = self.get_any_active_member().propose(remote_node, proposal_body)
+        return self.vote_using_majority(remote_node, proposal, careful_vote)
+
     def retire_code(self, remote_node, code_id):
         proposal_body, careful_vote = self.make_proposal(
             "remove_node_code", code_id=code_id
+        )
+        proposal = self.get_any_active_member().propose(remote_node, proposal_body)
+        return self.vote_using_majority(remote_node, proposal, careful_vote)
+
+    def remove_snp_measurement(self, remote_node, measurement):
+        proposal_body, careful_vote = self.make_proposal(
+            "remove_snp_measurement", measurement=measurement
+        )
+        proposal = self.get_any_active_member().propose(remote_node, proposal_body)
+        return self.vote_using_majority(remote_node, proposal, careful_vote)
+
+    def add_new_host_data(
+        self,
+        remote_node,
+        new_security_policy,
+        new_host_data,
+    ):
+        proposal_body, careful_vote = self.make_proposal(
+            "add_snp_host_data",
+            security_policy=new_security_policy,
+            host_data=new_host_data,
+        )
+        proposal = self.get_any_active_member().propose(remote_node, proposal_body)
+        return self.vote_using_majority(remote_node, proposal, careful_vote)
+
+    def retire_host_data(self, remote_node, host_data):
+        proposal_body, careful_vote = self.make_proposal(
+            "remove_snp_host_data",
+            host_data=host_data,
         )
         proposal = self.get_any_active_member().propose(remote_node, proposal_body)
         return self.vote_using_majority(remote_node, proposal, careful_vote)

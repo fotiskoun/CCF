@@ -2,6 +2,7 @@
 // Licensed under the Apache 2.0 License.
 
 #include "ccf/ds/logger.h"
+#include "ccf/pal/attestation.h"
 #include "ccf/version.h"
 #include "config_schema.h"
 #include "configuration.h"
@@ -275,7 +276,7 @@ int main(int argc, char** argv)
     ledger.register_message_handlers(bp.get_dispatcher());
 
     asynchost::SnapshotManager snapshots(
-      config.snapshots.directory, ledger, config.snapshots.read_only_directory);
+      config.snapshots.directory, config.snapshots.read_only_directory);
     snapshots.register_message_handlers(bp.get_dispatcher());
 
     // handle LFS-related messages from the enclave
@@ -402,6 +403,19 @@ int main(int argc, char** argv)
     startup_config.network = config.network;
     startup_config.worker_threads = config.worker_threads;
     startup_config.node_certificate = config.node_certificate;
+    startup_config.attestation = config.attestation;
+
+    // Get the nodes security policy via environment variable
+    if (access(ccf::pal::snp::DEVICE, F_OK) == 0)
+    {
+      LOG_INFO_FMT("Warning: AMD SEV-SNP support is currently experimental");
+      auto policy = std::getenv("SECURITY_POLICY");
+      if (policy != nullptr)
+      {
+        std::vector<uint8_t> raw = crypto::raw_from_b64(policy);
+        startup_config.security_policy = std::string(raw.begin(), raw.end());
+      }
+    }
 
     if (config.node_data_json_file.has_value())
     {
@@ -523,14 +537,6 @@ int main(int argc, char** argv)
         auto& [snapshot_dir, snapshot_file] = latest_committed_snapshot.value();
         startup_config.startup_snapshot =
           files::slurp(snapshot_dir / snapshot_file);
-
-        if (asynchost::is_snapshot_file_1_x(snapshot_file))
-        {
-          // Snapshot evidence seqno is only specified for 1.x snapshots which
-          // need to be verified by deserialising the ledger suffix.
-          startup_config.startup_snapshot_evidence_seqno_for_1_x =
-            asynchost::get_snapshot_evidence_idx_from_file_name(snapshot_file);
-        }
 
         LOG_INFO_FMT(
           "Found latest snapshot file: {} (size: {})",
