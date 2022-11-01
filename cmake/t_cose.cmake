@@ -13,7 +13,7 @@ set(T_COSE_SRCS
     "${T_COSE_SRC}/t_cose_util.c"
     "${T_COSE_DIR}/crypto_adapters/t_cose_openssl_crypto.c"
 )
-if("sgx" IN_LIST COMPILE_TARGETS)
+if(COMPILE_TARGET STREQUAL "sgx")
   add_enclave_library_c(t_cose.enclave ${T_COSE_SRCS})
   target_compile_definitions(t_cose.enclave PRIVATE ${T_COSE_DEFS})
   target_compile_options(t_cose.enclave INTERFACE ${T_COSE_OPTS_INTERFACE})
@@ -52,8 +52,10 @@ target_link_libraries(t_cose.host PUBLIC qcbor.host crypto)
 set_property(TARGET t_cose.host PROPERTY POSITION_INDEPENDENT_CODE ON)
 add_san(t_cose.host)
 
-install(
-  TARGETS t_cose.host
-  EXPORT ccf
-  DESTINATION lib
-)
+if(INSTALL_VIRTUAL_LIBRARIES)
+  install(
+    TARGETS t_cose.host
+    EXPORT ccf
+    DESTINATION lib
+  )
+endif()

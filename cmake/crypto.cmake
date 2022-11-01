@@ -25,7 +25,7 @@ set(CCFCRYPTO_SRC
     ${CCF_DIR}/src/crypto/openssl/cose_verifier.cpp
 )
 
-if("sgx" IN_LIST COMPILE_TARGETS)
+if(COMPILE_TARGET STREQUAL "sgx")
   add_enclave_library(ccfcrypto.enclave ${CCFCRYPTO_SRC})
   target_link_libraries(ccfcrypto.enclave PUBLIC qcbor.enclave)
   target_link_libraries(ccfcrypto.enclave PUBLIC t_cose.enclave)
@@ -47,8 +47,10 @@ target_link_libraries(ccfcrypto.host PUBLIC crypto)
 target_link_libraries(ccfcrypto.host PUBLIC ssl)
 set_property(TARGET ccfcrypto.host PROPERTY POSITION_INDEPENDENT_CODE ON)
 
-install(
-  TARGETS ccfcrypto.host
-  EXPORT ccf
-  DESTINATION lib
-)
+if(INSTALL_VIRTUAL_LIBRARIES)
+  install(
+    TARGETS ccfcrypto.host
+    EXPORT ccf
+    DESTINATION lib
+  )
+endif()
