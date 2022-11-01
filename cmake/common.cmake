@@ -705,7 +705,7 @@ set(SUBMITTER_DIR ${CCF_DIR}/perf-system/submitter)
 add_executable(
   submit
   ${SUBMITTER_DIR}/submit.cpp ${SUBMITTER_DIR}/handle_arguments.cpp
-  ${SUBMITTER_DIR}/handle_arguments.hpp ${SUBMITTER_DIR}/stdcpp.h
+  ${SUBMITTER_DIR}/handle_arguments.hpp
   ${SUBMITTER_DIR}/parquet_data.hpp
 )
 
