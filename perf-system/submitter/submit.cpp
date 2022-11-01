@@ -143,19 +143,6 @@ std::shared_ptr<RpcTlsClient> create_connection(
   return conn;
 }
 
-std::string get_response_string(client::HttpRpcTlsClient::Response resp)
-{
-  string response_string = "HTTP/1.1 " + std::to_string(resp.status) + " " +
-    http_status_str(resp.status) + "\n";
-  for (auto const& x : resp.headers)
-  {
-    response_string += (x.first + ':' + x.second + "\n");
-  }
-
-  response_string += std::string(resp.body.begin(), resp.body.end());
-  return response_string;
-}
-
 void storeParquetResults(ArgumentParser args, ParquetData data_handler)
 {
   cout << "Start storing results" << endl;
@@ -227,8 +214,7 @@ int main(int argc, char** argv)
   std::vector<std::vector<uint8_t>> raw_reqs(requests_size);
 
   // Store responses until they are processed to be written in parquet
-  std::vector<HttpRpcTlsClient::Response> resp(data_handler.IDS.size());
-
+  std::vector<std::vector<uint8_t>> resp_text(data_handler.IDS.size());
   // Add raw requests straight as uint8_t inside a vector
   for (size_t req = 0; req < requests_size; req++)
   {
@@ -246,11 +232,8 @@ int main(int argc, char** argv)
       gettimeofday(&start[req], NULL);
       auto connection = create_connection(certificates, server_address);
       connection->write(raw_reqs[req]);
-      const uint8_t* rr;
-      connection->read_raw_response(rr);
-      printf("2\n %s", rr);
-      // resp[req] = connection->read_response();
-      // gettimeofday(&end[req], NULL);
+      resp_text[req] = connection->read_raw_response();
+      gettimeofday(&end[req], NULL);
     }
   }
   else
@@ -265,7 +248,7 @@ int main(int argc, char** argv)
       connection->write(raw_reqs[req]);
       if (connection->bytes_available() or req - read_reqs > max_block_write)
       {
-        resp[read_reqs] = connection->read_response();
+        resp_text[read_reqs] = connection->read_raw_response();
         gettimeofday(&end[read_reqs], NULL);
         read_reqs++;
       }
@@ -274,22 +257,23 @@ int main(int argc, char** argv)
     // Read remaining responses
     while (read_reqs < requests_size)
     {
-      resp[read_reqs] = connection->read_response();
+      resp_text[read_reqs] = connection->read_raw_response();
       gettimeofday(&end[read_reqs], NULL);
       read_reqs++;
     }
   }
 
-  // std::cout << "Finished Request Submission" << endl;
+  std::cout << "Finished Request Submission" << endl;
 
-  // for (size_t req = 0; req < requests_size; req++)
-  // {
-  //   data_handler.RAW_RESPONSE.push_back(get_response_string(resp[req]));
-  //   double send_time = start[req].tv_sec + start[req].tv_usec / 1000000.0;
-  //   double response_time = end[req].tv_sec + end[req].tv_usec / 1000000.0;
-  //   data_handler.SEND_TIME.push_back(send_time);
-  //   data_handler.RESPONSE_TIME.push_back(response_time);
-  // }
+  for (size_t req = 0; req < requests_size; req++)
+  {
+    data_handler.RAW_RESPONSE.push_back(
+      std::string(reinterpret_cast<char*>(resp_text[req].data())));
+    double send_time = start[req].tv_sec + start[req].tv_usec / 1000000.0;
+    double response_time = end[req].tv_sec + end[req].tv_usec / 1000000.0;
+    data_handler.SEND_TIME.push_back(send_time);
+    data_handler.RESPONSE_TIME.push_back(response_time);
+  }
 
-  // storeParquetResults(args, data_handler);
+  storeParquetResults(args, data_handler);
 }
