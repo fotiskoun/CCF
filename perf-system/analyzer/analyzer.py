@@ -8,10 +8,19 @@ from prettytable import PrettyTable  # type: ignore
 import numpy as np
 import matplotlib.pyplot as plt  # type: ignore
 from typing import List
+import sys
+from loguru import logger as LOG
 
 latency_list = []  # type: List[float]
 ms_latency_list = []  # type: List[float]
 SEC_MS = 1000
+
+# Change default log format
+LOG.remove()
+LOG.add(
+    sys.stdout,
+    format="<green>[{time:HH:mm:ss.SSS}]</green> {message}",
+)
 
 
 def get_latency_list() -> List:
@@ -195,9 +204,14 @@ def plot_latency_distribution(ms_separator: float, highest_vals=15):
     min_latency = min(ms_latency_list)
 
     if max_latency < ms_separator:
-        print(
-            "I cannot print a latency distribution graph as all latencies are less than",
-            ms_separator,
+        LOG.remove()
+        LOG.add(
+            sys.stdout,
+            format="<red>[ERROR]:</red> {message}",
+        )
+
+        LOG.error(
+            f"Latency values are less than {ms_separator}, cannot produce latency distribution graph"
         )
         return
 
@@ -253,16 +267,16 @@ def default_analysis(send_file, response_file):
 
     successful_percent = iter_for_success_and_latency(df_sends, df_responses)
 
-    print("The request type sent is ", get_req_type(df_responses))
+    LOG.info(f"The request type sent is {get_req_type(df_responses)}")
 
     print(time_success_throughput_table(df_sends, df_responses, successful_percent))
     print(latencies_table(df_sends, df_responses))
 
     x = ["-"] * 20
-    print("\n", "".join(x), " Start plotting  ", "".join(x))
+    LOG.info(f'{"".join(x)} Start plotting  {"".join(x)}')
 
     plot_latency_by_id(df_sends)
     plot_latency_across_time(df_responses)
     plot_throughput_per_block(df_responses, 0.1)
 
-    print("\n", "".join(x), "Finished plotting", "".join(x))
+    LOG.info(f'{"".join(x)}Finished plotting{"".join(x)}')
