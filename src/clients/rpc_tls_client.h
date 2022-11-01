@@ -233,6 +233,21 @@ namespace client
       return std::move(last_response.value());
     }
 
+    const uint8_t* read_raw_response(const uint8_t* raw)
+    {
+      last_response = std::nullopt;
+
+      while (!last_response.has_value())
+      {
+        const auto next = read_all();
+        parser.execute(next.data(), next.size());
+        strcpy(raw, next.data());
+        printf("1\n %s", raw);
+        return raw;
+      }
+      return 0;
+    }
+
     std::optional<Response> read_response_non_blocking()
     {
       if (bytes_available())

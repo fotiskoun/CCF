@@ -246,8 +246,11 @@ int main(int argc, char** argv)
       gettimeofday(&start[req], NULL);
       auto connection = create_connection(certificates, server_address);
       connection->write(raw_reqs[req]);
-      resp[req] = connection->read_response();
-      gettimeofday(&end[req], NULL);
+      const uint8_t* rr;
+      connection->read_raw_response(rr);
+      printf("2\n %s", rr);
+      // resp[req] = connection->read_response();
+      // gettimeofday(&end[req], NULL);
     }
   }
   else
@@ -277,16 +280,16 @@ int main(int argc, char** argv)
     }
   }
 
-  std::cout << "Finished Request Submission" << endl;
+  // std::cout << "Finished Request Submission" << endl;
 
-  for (size_t req = 0; req < requests_size; req++)
-  {
-    data_handler.RAW_RESPONSE.push_back(get_response_string(resp[req]));
-    double send_time = start[req].tv_sec + start[req].tv_usec / 1000000.0;
-    double response_time = end[req].tv_sec + end[req].tv_usec / 1000000.0;
-    data_handler.SEND_TIME.push_back(send_time);
-    data_handler.RESPONSE_TIME.push_back(response_time);
-  }
+  // for (size_t req = 0; req < requests_size; req++)
+  // {
+  //   data_handler.RAW_RESPONSE.push_back(get_response_string(resp[req]));
+  //   double send_time = start[req].tv_sec + start[req].tv_usec / 1000000.0;
+  //   double response_time = end[req].tv_sec + end[req].tv_usec / 1000000.0;
+  //   data_handler.SEND_TIME.push_back(send_time);
+  //   data_handler.RESPONSE_TIME.push_back(response_time);
+  // }
 
-  storeParquetResults(args, data_handler);
+  // storeParquetResults(args, data_handler);
 }
