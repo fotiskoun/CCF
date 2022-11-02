@@ -2,6 +2,7 @@
 // Licensed under the Apache 2.0 License.
 
 #include "ccf/crypto/verifier.h"
+#include "ccf/ds/logger.h"
 #include "ccf/service/node_info_network.h"
 #include "clients/rpc_tls_client.h"
 #include "ds/files.h"
@@ -34,11 +35,11 @@ void readParquetFile(string generator_filename, ParquetData& data_handler)
   st = parquet::arrow::OpenFile(input, pool, &arrow_reader);
   if (!st.ok())
   {
-    std::cout << "Couldn't found generator file" << std::endl;
+    LOG_INFO_FMT("Couldn't found generator file");
   }
   else
   {
-    std::cout << "Found generator file" << std::endl;
+    LOG_INFO_FMT("Found generator file");
   }
 
   // Read entire file as a single Arrow table
@@ -47,11 +48,11 @@ void readParquetFile(string generator_filename, ParquetData& data_handler)
   st = arrow_reader->ReadTable(selected_columns, &table);
   if (!st.ok())
   {
-    std::cout << "Couldn't open generator file" << std::endl;
+    LOG_INFO_FMT("Couldn't open generator file");
   }
   else
   {
-    std::cout << "Opened generator file" << std::endl;
+    LOG_INFO_FMT("Opened generator file");
   }
 
   std::shared_ptr<::arrow::ChunkedArray> column;
@@ -131,8 +132,6 @@ std::shared_ptr<RpcTlsClient> create_connection(
   auto conn =
     std::make_shared<RpcTlsClient>(host, port, nullptr, tls_cert, key_id);
 
-  conn->set_prefix("app");
-
   // Report ciphersuite of first client (assume it is the same for each)
   if (is_first_time)
   {
@@ -145,7 +144,7 @@ std::shared_ptr<RpcTlsClient> create_connection(
 
 void storeParquetResults(ArgumentParser args, ParquetData data_handler)
 {
-  cout << "Start storing results" << endl;
+  LOG_INFO_FMT("Start storing results");
 
   // Initialize Send Columns
   std::vector<
@@ -184,11 +183,12 @@ void storeParquetResults(ArgumentParser args, ParquetData data_handler)
        << data_handler.RAW_RESPONSE[i] << parquet::EndRow;
   }
 
-  cout << "Finished storing results" << endl;
+  LOG_INFO_FMT("Finished storing results");
 }
 
 int main(int argc, char** argv)
 {
+  logger::config::default_init();
   ArgumentParser args;
   args.argument_assigner(argc, argv);
   ParquetData data_handler;
@@ -222,7 +222,7 @@ int main(int argc, char** argv)
       data_handler.REQUEST[req].begin(), data_handler.REQUEST[req].end());
   }
 
-  std::cout << "Start Request Submission" << endl;
+  LOG_INFO_FMT("Start Request Submission");
 
   if (!args.isPipeline)
   {
@@ -263,7 +263,7 @@ int main(int argc, char** argv)
     }
   }
 
-  std::cout << "Finished Request Submission" << endl;
+  LOG_INFO_FMT("Finished Request Submission");
 
   for (size_t req = 0; req < requests_size; req++)
   {
