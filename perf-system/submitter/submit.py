@@ -137,52 +137,62 @@ def main():
     """
     Receives the command line arguments
     """
-    arg_gen_file = "../generator/requests.parquet"
-    arg_sends_file = "./sends.parquet"
-    arg_response_file = "./responses.parquet"
-    arg_server_address = "127.0.0.1:8000"
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Sample Submitter for perf workloads",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
     parser.add_argument(
         "-ca",
         "--cacert",
-        help="Use the specified certificate file to verify\
-                        the peer",
+        help="Use the specified file for certificate verification.",
         type=str,
     )
     parser.add_argument(
-        "-c", "--cert", help="Use the specified client certificate file", type=str
+        "-c",
+        "--cert",
+        help="Use the provided certificate file when working with a SSL-based protocol.",
+        type=str,
     )
-    parser.add_argument("-k", "--key", help="Private key file", type=str)
     parser.add_argument(
-        "-d", "--duration", help="Time duration for the submitter to run", type=int
+        "-k",
+        "--key",
+        help="Specify the path to the file containing the private key.",
+        type=str,
+    )
+    parser.add_argument(
+        "-d",
+        "--duration",
+        help="Time duration for the submitter to run",
+        default=-1,
+        type=int,
     )
     parser.add_argument(
         "-gf",
-        "--generator_file",
-        help="Name of the parquet file with the generated requests\
-            to be submitted. Default file `../generator/requests.parquet`",
+        "--generator_filepath",
+        help="Path to parquet file with the generated requests to be submitted.",
+        default="../generator/requests.parquet",
         type=str,
     )
     parser.add_argument(
         "-sf",
-        "--send_file",
-        help="Name of the parquet file to store the submitted\
-            requests. Default file `./sends.parquet`",
+        "--send_filepath",
+        help="Path to parquet file to store the submitted requests.",
+        default="./sends.parquet",
         type=str,
     )
     parser.add_argument(
         "-rf",
-        "--response_file",
-        help="Name of the parquet file to store the responses\
-            from the submitted requests. Default file `./responses.parquet`",
+        "--response_filepath",
+        help="Path to parquet file to store the responses from the submitted requests.",
+        default="./responses.parquet",
         type=str,
     )
 
     parser.add_argument(
         "-sa",
         "--server_address",
-        help="The address of the server to submit the requests\
-            default is set to `127.0.0.1:8000`",
+        help="Specify the address to submit requests.",
+        default="127.0.0.1:8000",
         type=str,
     )
 
@@ -190,14 +200,10 @@ def main():
 
     asyncio.run(
         read(
-            [args.cacert or "", args.cert or "", args.key or ""],
-            [
-                args.generator_file or arg_gen_file,
-                args.send_file or arg_sends_file,
-                args.response_file or arg_response_file,
-            ],
-            args.duration or -1,
-            args.server_address or arg_server_address,
+            [args.cacert, args.cert, args.key],
+            [args.generator_filepath, args.send_filepath, args.response_filepath],
+            args.duration,
+            args.server_address,
         )
     )
     print("Finished Submission")
