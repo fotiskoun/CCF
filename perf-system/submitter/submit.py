@@ -137,11 +137,10 @@ def main():
     """
     Receives the command line arguments
     """
-    arg_gen_file = "../generator/requests.parquet"
-    arg_sends_file = "./sends.parquet"
-    arg_response_file = "./responses.parquet"
-    arg_server_address = "127.0.0.1:8000"
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Sample Submitter for perf workloads",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
     parser.add_argument(
         "-ca",
         "--cacert",
@@ -161,35 +160,39 @@ def main():
         type=str,
     )
     parser.add_argument(
-        "-d", "--duration", help="Time duration for the submitter to run", type=int
+        "-d",
+        "--duration",
+        help="Time duration for the submitter to run",
+        default=-1,
+        type=int,
     )
     parser.add_argument(
         "-gf",
-        "--generator_file",
-        help="Path to parquet file with the generated requests\
-            to be submitted. Default file `../generator/requests.parquet`",
+        "--generator_filepath",
+        help="Path to parquet file with the generated requests to be submitted.",
+        default="../generator/requests.parquet",
         type=str,
     )
     parser.add_argument(
         "-sf",
-        "--send_file",
-        help="Path to parquet file to store the submitted\
-            requests. Default file `./sends.parquet`",
+        "--send_filepath",
+        help="Path to parquet file to store the submitted requests.",
+        default="./sends.parquet",
         type=str,
     )
     parser.add_argument(
         "-rf",
-        "--response_file",
-        help="Path to parquet file to store the responses\
-            from the submitted requests. Default file `./responses.parquet`",
+        "--response_filepath",
+        help="Path to parquet file to store the responses from the submitted requests.",
+        default="./responses.parquet",
         type=str,
     )
 
     parser.add_argument(
         "-sa",
         "--server_address",
-        help="TSpecify the address to submit requests.\
-            default is set to `127.0.0.1:8000`",
+        help="Specify the address to submit requests.",
+        default="127.0.0.1:8000",
         type=str,
     )
 
@@ -197,14 +200,10 @@ def main():
 
     asyncio.run(
         read(
-            [args.cacert or "", args.cert or "", args.key or ""],
-            [
-                args.generator_file or arg_gen_file,
-                args.send_file or arg_sends_file,
-                args.response_file or arg_response_file,
-            ],
-            args.duration or -1,
-            args.server_address or arg_server_address,
+            [args.cacert, args.cert, args.key],
+            [args.generator_filepath, args.send_filepath, args.response_filepath],
+            args.duration,
+            args.server_address,
         )
     )
     print("Finished Submission")
