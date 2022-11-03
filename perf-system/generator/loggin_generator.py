@@ -10,7 +10,7 @@ msgs = Messages()
 
 inputs = msgs.append(HOST, "/app/log/private/count", "GET")
 
-for i in range(14):
+for i in range(100):
     msgs.append(
         HOST,
         "/app/log/private",
@@ -19,11 +19,11 @@ for i in range(14):
     )
 inputs = msgs.append(HOST, "/app/log/private/count", "GET")
 
-for i in range(14):
-    msgs.append(HOST, "/app/log/private?id=" + str(i), "GET")
+for i in range(3000):
+    msgs.append(HOST, "/app/log/private?id=" + str(i % 100), "GET")
 inputs = msgs.append(HOST, "/app/log/private/count", "GET")
 
-for i in range(14):
+for i in range(100):
     msgs.append(HOST, "/app/log/private?id=" + str(i), "DELETE")
 inputs = msgs.append(HOST, "/app/log/private/count", "GET")
 
