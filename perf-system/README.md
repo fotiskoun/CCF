@@ -5,13 +5,15 @@ _Generator_
 _Submitter_
 _Analysis_
 
-In order to run the components you need python3 and run each component selectively. The folder contatining each these components is the **CCF/perf-system**
+The folder containing each these components is the **CCF/perf-system**
 
-The required packages are included inside the the requirements.txt and can be installed running the following command from the **CCF/perf-system** directory
+The required Python packages are included inside the the  **CCF/perf-system/requirements.txt** and can be installed running the following command from the **CCF/perf-system** directory.
 
 ```sh
 pip install -r requirements.txt
 ```
+
+For installation of the required libraries for C++ see on the description of the [Submitter](#submitter) component
 
 After that, run your CCF system.
 
@@ -25,18 +27,22 @@ python3 generator.py
 
 By default, the generator will create a .parquet file, which is necessary for the following component, using the configurations provided. To provide another configuration file please use the following options:
 
-- `-hs, --host`: The main host to submit the request. Default `http://localhost:8000`
-- `-p, --path`: The realtive path to submit the request. Default `app/log/private`
-- `-t, --type`: The type of the HTTP request (Only HTTP/1.1 which is the default is supported for now)
-- `-vr, --verb`: The request action. Default `POST` (Only `POST` and `GET` are supported for now)
-- `-r, --rows`: The number of requests to send. Default `16`
-- `-pf, --parquet_filename`: Name of the parquet file to store the generated requests. Default file `./requests.parquet`
-- `-d, --data`: A string with the data to be sent in a POST or DELETE request
+### Optional arguments:
+- `-h, --help`: show this help message and exit
+- `-hs HOST, --host HOST`: The host to submit the request. (default: 127.0.0.1:8000)
+- `-p PATH, --path PATH`: The relative path to submit the request. (default: /app/log/private)
+- `-vr VERB, --verb VERB`: The request action. (default: POST)
+- `-r ROWS, --rows ROWS`: The number of requests to send. (default: 16)
+- `-rt REQUEST_TYPE, --request_type REQUEST_TYPE`: The transfer protocol for the request. (default: HTTP/1.1)
+- `-pf PATH_TO_PARQUET, --path_to_parquet PATH_TO_PARQUET`: Path to the parquet file to store the generated requests (default: ./requests.parquet)
+- `-ct CONTENT_TYPE, --content_type CONTENT_TYPE`: The Content-Type representation header is used to indicate the original media type of the resource. (default: application-json)
+- `-d DATA, --data DATA`: A string with the data to be sent with a request (default: {"id": 1, "msg": "Send message with id 1"})
 
-This component consists of different files including the **CCF/perf-system/Generator/loggin_generator.py**, which is an alternative of the command line options, providing more flexibility to the user in order to create his own more complex requests. There exist some samples, calling `create_verb()` function to initiate rows of requests. The `create_verb()` function will optionally take a string representing the data you want to post on the server and/or a list of strings representing the headers to be included to the request. The `content length` header will be automatically generated once the data are provided.
-All requests in the end should be followed by the `create_parquet()` function in order to generate the parquet file.
+This component consists of different files including the **CCF/perf-system/Generator/loggin_generator.py**, which is an alternative of the command line options, providing more flexibility to the user in order to create his own more complex requests. There exist some samples, creating an object to initialize a dataframe and call `append()` function to add requests specified by the arguments given to the dataframe. The `append()` function returns the last batch of requests created as a dataframe in order to create more requests based on the already appended. 
+All requests in the end should be followed by the `to_parquet_file()` function in order to generate the parquet file.
 You can either edit **CCF/perf-system/Generator/loggin_generator.py** or create your own file in the same directory calling functions from the **CCF/perf-system/Generator/generator.py** in order to construct your own series of requests.
 
+<a id="submitter"></a>
 ## Submitter
 
 In the **CCF/perf-system/submitter** there are two submitter components one written in C++ language and a simpler in Python.
@@ -59,20 +65,22 @@ ninja submit
 ./submit -manual_configurations
 ```
 
-You can provide certification files or configure import/export files by replacing `-manual_configurations` in the latest command with one or more of the following options, providing after each option the corresponsing argument (where necessary).
+You can provide certification files or configure import/export files by replacing `-manual_configurations` in the latest command with one or more of the following options, providing after each option the corresponding argument (where necessary).
 
-- `-c`: Followed by the path to the certificate file
-- `-k`: Followed by the path to the private key file
-- `-ca`: Followed by the path to the specified certificate file to verify the peer
-- `-gf`: Followed by the path to the file that contains the generated requests. Default file `../perf-system/generator/requests.parquet`
-- `-sf`: Followed by the path to the parquet file to store submission information for the requests that have been submitted. Default file `../perf-system/submitter/cpp_sends.parquet`.
-- `-rf`: Followed by the path to the parquet file to store the responses from the requests that have been submitted. Default file `../perf-system/submitter/cpp_responses.parquet`.
-- `-pipeline`: The existence of this option will force the submitter to use HTTP/1.1 pipelining.
-- `-sa`: Followed by the server address (`host:port`) to submit the requests. Default server address `127.0.0.1:8000`
+### Optional arguments:
+- `-h,--help`: Print this help message and exit
+- `--cert`: Use the provided certificate file when working with a SSL-based protocol.
+- `--key`: Specify the path to the file containing the private key.
+- `--cacert`: Use the specified file for certificate verification.
+- `--server-address`: Specify the address to submit requests. (default: 127.0.0.1:8000)
+- `--send-filepath`: Path to parquet file to store the submitted requests. (default: ../perf-system/submitter/cpp_send.parquet)
+- `--response-filepath`: Path to parquet file to store the responses from the submitted requests. (default: ../perf-system/submitter/cpp_respond.parquet)
+- `--generator-filepath`: Path to parquet file with the generated requests to be submitted. (default: ../perf-system/generator/requests.parquet)
+- `--pipeline`: Enable HTTP/1.1 pipelining option.
 
 ### Python
 
-To run the submitter writtern in **Python** you need to run from the current directory the following command
+To run the submitter written in **Python** you need to run from the current directory the following command
 
 ```sh
 python3 submitter.py
@@ -80,28 +88,32 @@ python3 submitter.py
 
 When running the submitter you have the following options to configure the submitter:
 
-- `-ca, --cacert`: Use the specified certificate file to verify the peer
-- `-c, --cert`: Use the specified client certificate file
-- `-k, --key`: Private key file
-- `-d, --duration`: Set the duration time for the submitter to run over the data from generator file
-- `-gf, --generator_file`: Name of the parquet file that contains the requests to be submitted. Default file `../generator/requests.parquet`
-- `-sf, --send_file`: Name of the parquet file to store the requests that have been submitted. Default file `./sends.parquet`.
-- `-rf, --response_file`: Name of the parquet file to store the responses from the requests that have been submitted. Default file `./responses.parquet`.
-- `-sa, --server_address` The address of the server to submit the requests default is set to `127.0.0.1:8000`
+### Optional arguments:
+- `-h, --help`: Show this help message and exit
+- `-ca CACERT, --cacert CACERT`: Use the specified file for certificate verification.
+- `-c CERT, --cert CERT`: Use the provided certificate file when working with a SSL-based protocol.
+- `-k KEY, --key KEY`: Specify the path to the file containing the private key.
+- `-d DURATION, --duration DURATION`: Time duration for the submitter to run (default: -1)
+- `-gf GENERATOR_FILEPATH, --generator_filepath GENERATOR_FILEPATH`: Path to parquet file with the generated requests to be submitted. (default: ../generator/requests.parquet)
+- `-sf SEND_FILEPATH, --send_filepath SEND_FILEPATH`: Path to parquet file to store the submitted requests. (default: ./sends.parquet)
+- `-rf RESPONSE_FILEPATH, --response_filepath RESPONSE_FILEPATH`: Path to parquet file to store the responses from the submitted requests. (default: ./responses.parquet)
+- `-sa SERVER_ADDRESS, --server_address SERVER_ADDRESS`: Specify the address to submit requests. (default: 127.0.0.1:8000)
 
 When the submitter is executed successfully, there will be two .parquet files generated in this directory.
 
 ## Analyzer
 
-The **CCF/perf-system/analyzer** directory, contatins the last component which is used to produce some metrics based on the submitted data of the previous component. For this component you need to run the following command from the current directory:
+The **CCF/perf-system/analyzer** directory, contains the last component which is used to produce some metrics based on the submitted data of the previous component. There are two files in this directory, one containing the library with the available functions in order to run your experiments and a second that has a command line tool to run a default analysis. By creating a new python file to handle the dataframes and latencies for the requests, you can create your own analysis. For the default analysis you can run the following command from the current directory:
 
 ```sh
 python3 analysis.py
 ```
 
-When running the analyzer you have the following options to specify the exported files:
+You have the following options to specify the exported files:
 
-- `-sf, --send_file`: Name of the parquet file for the requests that have been submitted. Default file `../submitter/cpp_send.parquet`.
-- `-rf, --response_file`: Name of the parquet file for the responses from the requests that have been submitted. Default file `../submitter/cpp_respond.parquet`.
+### Optional arguments:
+- `-h, --help`: Show this help message and exit
+- `-sf SEND_FILE_PATH, --send_file_path SEND_FILE_PATH`: Path to the parquet file that contains the submitted requests (default: ../submitter/cpp_send.parquet)
+- `-rf RESPONSE_FILE_PATH, --response_file_path RESPONSE_FILE_PATH`: Path to the parquet file that contains the responses from the submitted requests (default: ../submitter/cpp_respond.parquet)
 
-After the execution, in the command prompt will be written two tables with some metrics and in the current directory there will be exported three images plotting the latency accros time or based on the id and the throughput of the requests.
+After the execution, in the command prompt will be written two tables with some metrics and in the current directory there will be exported images plotting the latency across time or based on the id and the throughput of the requests.
