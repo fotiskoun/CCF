@@ -145,35 +145,42 @@ def main():
     parser.add_argument(
         "-ca",
         "--cacert",
-        help="Use the specified certificate file to verify\
-                        the peer",
+        help="Use the specified file for certificate verification.",
         type=str,
     )
     parser.add_argument(
-        "-c", "--cert", help="Use the specified client certificate file", type=str
+        "-c",
+        "--cert",
+        help="Use the provided certificate file when working with a SSL-based protocol.",
+        type=str,
     )
-    parser.add_argument("-k", "--key", help="Private key file", type=str)
+    parser.add_argument(
+        "-k",
+        "--key",
+        help="Specify the path to the file containing the private key.",
+        type=str,
+    )
     parser.add_argument(
         "-d", "--duration", help="Time duration for the submitter to run", type=int
     )
     parser.add_argument(
         "-gf",
         "--generator_file",
-        help="Name of the parquet file with the generated requests\
+        help="Path to parquet file with the generated requests\
             to be submitted. Default file `../generator/requests.parquet`",
         type=str,
     )
     parser.add_argument(
         "-sf",
         "--send_file",
-        help="Name of the parquet file to store the submitted\
+        help="Path to parquet file to store the submitted\
             requests. Default file `./sends.parquet`",
         type=str,
     )
     parser.add_argument(
         "-rf",
         "--response_file",
-        help="Name of the parquet file to store the responses\
+        help="Path to parquet file to store the responses\
             from the submitted requests. Default file `./responses.parquet`",
         type=str,
     )
@@ -181,7 +188,7 @@ def main():
     parser.add_argument(
         "-sa",
         "--server_address",
-        help="The address of the server to submit the requests\
+        help="TSpecify the address to submit requests.\
             default is set to `127.0.0.1:8000`",
         type=str,
     )

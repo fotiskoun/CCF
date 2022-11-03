@@ -4,11 +4,13 @@
 #include "ccf/crypto/verifier.h"
 #include "ccf/ds/logger.h"
 #include "ccf/service/node_info_network.h"
+#include "clients/perf/perf_client.h"
 #include "clients/rpc_tls_client.h"
 #include "ds/files.h"
 #include "handle_arguments.hpp"
 #include "parquet_data.hpp"
 
+#include <CLI11/CLI11.hpp>
 #include <arrow/array/array_binary.h>
 #include <arrow/filesystem/localfs.h>
 #include <arrow/io/file.h>
@@ -22,13 +24,13 @@ crypto::Pem key = {};
 std::string key_id = "Invalid";
 std::shared_ptr<tls::Cert> tls_cert = nullptr;
 
-void readParquetFile(string generator_filename, ParquetData& data_handler)
+void readParquetFile(string generator_filepath, ParquetData& data_handler)
 {
   arrow::Status st;
   arrow::MemoryPool* pool = arrow::default_memory_pool();
   arrow::fs::LocalFileSystem file_system;
   std::shared_ptr<arrow::io::RandomAccessFile> input =
-    file_system.OpenInputFile(generator_filename).ValueOrDie();
+    file_system.OpenInputFile(generator_filepath).ValueOrDie();
 
   // Open Parquet file reader
   std::unique_ptr<parquet::arrow::FileReader> arrow_reader;
@@ -74,7 +76,7 @@ void readParquetFile(string generator_filename, ParquetData& data_handler)
 }
 
 parquet::StreamWriter initParquetColumns(
-  std::string filename,
+  std::string filepath,
   ParquetData& data_handler,
   std::vector<
     std::tuple<std::string, parquet::Type::type, parquet::ConvertedType::type>>
@@ -82,7 +84,7 @@ parquet::StreamWriter initParquetColumns(
 {
   std::shared_ptr<arrow::io::FileOutputStream> outfile;
 
-  PARQUET_ASSIGN_OR_THROW(outfile, arrow::io::FileOutputStream::Open(filename));
+  PARQUET_ASSIGN_OR_THROW(outfile, arrow::io::FileOutputStream::Open(filepath));
 
   parquet::WriterProperties::Builder builder;
 
@@ -169,14 +171,14 @@ void storeParquetResults(ArgumentParser args, ParquetData data_handler)
         parquet::ConvertedType::UTF8)};
 
   // Write Send Parquet
-  auto os = initParquetColumns(args.send_filename, data_handler, send_cols);
+  auto os = initParquetColumns(args.send_filepath, data_handler, send_cols);
   for (size_t i = 0; i < data_handler.SEND_TIME.size(); i++)
   {
     os << to_string(i) << data_handler.SEND_TIME[i] << parquet::EndRow;
   }
 
   // Write Response Parquet
-  os = initParquetColumns(args.response_filename, data_handler, response_cols);
+  os = initParquetColumns(args.response_filepath, data_handler, response_cols);
   for (size_t i = 0; i < data_handler.RESPONSE_TIME.size(); i++)
   {
     os << to_string(i) << data_handler.RESPONSE_TIME[i]
@@ -189,12 +191,14 @@ void storeParquetResults(ArgumentParser args, ParquetData data_handler)
 int main(int argc, char** argv)
 {
   logger::config::default_init();
-  ArgumentParser args;
-  args.argument_assigner(argc, argv);
+  CLI::App cli_app{"Perf Tool"};
+  ArgumentParser args("Perf Tool", argv[0], cli_app);
+  CLI11_PARSE(cli_app, argc, argv);
+
   ParquetData data_handler;
   std::vector<string> certificates = {args.cert, args.key, args.rootCa};
 
-  readParquetFile(args.generator_filename, data_handler);
+  readParquetFile(args.generator_filepath, data_handler);
   std::string server_address = args.server_address;
 
   // Keep only the host and port removing any https:// characters
