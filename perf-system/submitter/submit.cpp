@@ -113,7 +113,18 @@ std::shared_ptr<RpcTlsClient> create_connection(
 {
   // Create a cert if this is our first rpc_connection
   const bool is_first_time = tls_cert == nullptr;
+  const auto [host, port] = ccf::split_net_address(server_address);
 
+  if (certificates[0].empty())
+  {
+    if (is_first_time)
+      tls_cert = std::make_shared<tls::Cert>(
+        nullptr, std::nullopt, std::nullopt, std::nullopt, false);
+
+    auto conn =
+      std::make_shared<RpcTlsClient>(host, port, nullptr, tls_cert, key_id);
+    return conn;
+  }
   if (is_first_time)
   {
     const auto raw_cert = files::slurp(certificates[0].c_str());
@@ -130,16 +141,8 @@ std::shared_ptr<RpcTlsClient> create_connection(
       std::make_shared<tls::Cert>(std::make_shared<tls::CA>(ca), cert_pem, key);
   }
 
-  const auto [host, port] = ccf::split_net_address(server_address);
   auto conn =
     std::make_shared<RpcTlsClient>(host, port, nullptr, tls_cert, key_id);
-
-  // Report ciphersuite of first client (assume it is the same for each)
-  if (is_first_time)
-  {
-    LOG_DEBUG_FMT(
-      "Connected to server via TLS ({})", conn->get_ciphersuite_name());
-  }
 
   return conn;
 }
