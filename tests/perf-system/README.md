@@ -5,9 +5,9 @@ _Generator_
 _Submitter_
 _Analysis_
 
-The folder containing each these components is the **CCF/perf-system**
+The folder containing each these components is the **CCF/tests/perf-system**
 
-The required Python packages are included inside the the  **CCF/perf-system/requirements.txt** and can be installed running the following command from the **CCF/perf-system** directory.
+The required Python packages are included inside the the  **CCF/tests/perf-system/requirements.txt** and can be installed running the following command from the **CCF/tests/perf-system** directory.
 
 ```sh
 pip install -r requirements.txt
@@ -19,7 +19,7 @@ After that, run your CCF system.
 
 ## Generator
 
-Inside the **CCF/perf-system/generator** exists the generator component and you can execute it from this directory with the following command:
+Inside the **CCF/tests/perf-system/generator** exists the generator component and you can execute it from this directory with the following command:
 
 ```sh
 python3 generator.py
@@ -38,14 +38,14 @@ By default, the generator will create a .parquet file, which is necessary for th
 - `-ct CONTENT_TYPE, --content_type CONTENT_TYPE`: The Content-Type representation header is used to indicate the original media type of the resource. (default: application-json)
 - `-d DATA, --data DATA`: A string with the data to be sent with a request (default: {"id": 1, "msg": "Send message with id 1"})
 
-This component consists of different files including the **CCF/perf-system/Generator/loggin_generator.py**, which is an alternative of the command line options, providing more flexibility to the user in order to create his own more complex requests. There exist some samples, creating an object to initialize a dataframe and call `append()` function to add requests specified by the arguments given to the dataframe. The `append()` function returns the last batch of requests created as a dataframe in order to create more requests based on the already appended. 
+This component consists of different files including the **CCF/tests/perf-system/Generator/loggin_generator.py**, which is an alternative of the command line options, providing more flexibility to the user in order to create his own more complex requests. There exist some samples, creating an object to initialize a dataframe and call `append()` function to add requests specified by the arguments given to the dataframe. The `append()` function returns the last batch of requests created as a dataframe in order to create more requests based on the already appended. 
 All requests in the end should be followed by the `to_parquet_file()` function in order to generate the parquet file.
-You can either edit **CCF/perf-system/Generator/loggin_generator.py** or create your own file in the same directory calling functions from the **CCF/perf-system/Generator/generator.py** in order to construct your own series of requests.
+You can either edit **CCF/tests/perf-system/Generator/loggin_generator.py** or create your own file in the same directory calling functions from the **CCF/tests/perf-system/Generator/generator.py** in order to construct your own series of requests.
 
 <a id="submitter"></a>
 ## Submitter
 
-In the **CCF/perf-system/submitter** there are two submitter components one written in C++ language and a simpler in Python.
+In the **CCF/tests/perf-system/submitter** there are two submitter components one written in C++ language and a simpler in Python.
 
 ### C++
 
@@ -60,11 +60,12 @@ After installing arrow you can build and run the submitter from the root CCF dir
 ```sh
 mkdir build
 cd build
-cmake -GNinja ..
+cmake -DCOMPILE_TARGET=sgx -GNinja ..
 ninja submit
 ./submit -manual_configurations
 ```
 
+You should change the `-DCOMPILE_TARGET` to virtual if you are not running under the sgx configuration.
 You can provide certification files or configure import/export files by replacing `-manual_configurations` in the latest command with one or more of the following options, providing after each option the corresponding argument (where necessary).
 
 ### Optional arguments:
@@ -73,9 +74,9 @@ You can provide certification files or configure import/export files by replacin
 - `--key`: Specify the path to the file containing the private key.
 - `--cacert`: Use the specified file for certificate verification.
 - `--server-address`: Specify the address to submit requests. (default: 127.0.0.1:8000)
-- `--send-filepath`: Path to parquet file to store the submitted requests. (default: ../perf-system/submitter/cpp_send.parquet)
-- `--response-filepath`: Path to parquet file to store the responses from the submitted requests. (default: ../perf-system/submitter/cpp_respond.parquet)
-- `--generator-filepath`: Path to parquet file with the generated requests to be submitted. (default: ../perf-system/generator/requests.parquet)
+- `--send-filepath`: Path to parquet file to store the submitted requests. (default: ../tests/perf-system/submitter/cpp_send.parquet)
+- `--response-filepath`: Path to parquet file to store the responses from the submitted requests. (default: ../tests/perf-system/submitter/cpp_respond.parquet)
+- `--generator-filepath`: Path to parquet file with the generated requests to be submitted. (default: ../tests/perf-system/generator/requests.parquet)
 - `--pipeline`: Enable HTTP/1.1 pipelining option.
 
 ### Python
