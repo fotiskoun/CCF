@@ -750,7 +750,7 @@ function(add_picobench name)
 endfunction()
 
 # Perf tool executable
-set(SUBMITTER_DIR ${CCF_DIR}/perf-system/submitter)
+set(SUBMITTER_DIR ${CCF_DIR}/tests/perf-system/submitter)
 
 add_executable(
   submit

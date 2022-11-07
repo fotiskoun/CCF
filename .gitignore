@@ -36,7 +36,7 @@ workspace/*
 ledger_[0-9]*
 snapshot_[0-9]*
 doc/operations/generated_config.rst
-perf-system/submitter/*.pem
+tests/perf-system/submitter/*.pem
 *.parquet
-perf-system/analyzer/*.png
-perf-system/analyzer/*.txt
+tests/perf-system/analyzer/*.png
+tests/perf-system/analyzer/*.txt

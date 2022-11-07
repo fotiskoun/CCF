@@ -48,9 +48,9 @@ fi
 echo "$CHECK_DELIMITER"
 echo "-- C/C++/Proto format"
 if [ $FIX -ne 0 ]; then
-  "$SCRIPT_DIR"/check-format.sh -f include src samples perf-system
+  "$SCRIPT_DIR"/check-format.sh -f include src samples
 else
-  "$SCRIPT_DIR"/check-format.sh include src samples perf-system
+  "$SCRIPT_DIR"/check-format.sh include src samples
 fi
 
 echo "$CHECK_DELIMITER"
@@ -74,9 +74,9 @@ python3.8 "$SCRIPT_DIR"/notice-check.py
 echo "$CHECK_DELIMITER"
 echo "-- CMake format"
 if [ $FIX -ne 0 ]; then
-  "$SCRIPT_DIR"/check-cmake-format.sh -f cmake samples src tests perf-system CMakeLists.txt
+  "$SCRIPT_DIR"/check-cmake-format.sh -f cmake samples src tests CMakeLists.txt
 else
-  "$SCRIPT_DIR"/check-cmake-format.sh cmake samples src tests perf-system CMakeLists.txt
+  "$SCRIPT_DIR"/check-cmake-format.sh cmake samples src tests CMakeLists.txt
 fi
 
 echo "$CHECK_DELIMITER"
@@ -94,9 +94,9 @@ pip install -U wheel black pylint mypy 1>/dev/null
 echo "$CHECK_DELIMITER"
 echo "-- Python format"
 if [ $FIX -ne 0 ]; then
-  git ls-files tests/ python/ scripts/ perf-system/ .cmake-format.py | grep -e '\.py$' | xargs black
+  git ls-files tests/ python/ scripts// .cmake-format.py | grep -e '\.py$' | xargs black
 else
-  git ls-files tests/ python/ scripts/ perf-system/ .cmake-format.py | grep -e '\.py$' | xargs black --check
+  git ls-files tests/ python/ scripts// .cmake-format.py | grep -e '\.py$' | xargs black --check
 fi
 
 # Install test dependencies before linting
@@ -105,8 +105,8 @@ pip install -U -r python/requirements.txt 1>/dev/null
 
 echo "$CHECK_DELIMITER"
 echo "-- Python lint"
-PYTHONPATH=./tests git ls-files tests/ python/ perf-system/ | grep -e '\.py$' | xargs python -m pylint --ignored-modules "*_pb2"
+PYTHONPATH=./tests git ls-files tests/ python// | grep -e '\.py$' | xargs python -m pylint --ignored-modules "*_pb2"
 
 echo "$CHECK_DELIMITER"
 echo "-- Python types"
-git ls-files python/ perf-system/ | grep -e '\.py$' | xargs mypy
+git ls-files python// | grep -e '\.py$' | xargs mypy
