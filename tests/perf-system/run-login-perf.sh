@@ -6,7 +6,7 @@ set -e
 
 PERF_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
-CCF_DIR=$( dirname "$PERF_DIR" )
+CCF_DIR=$(dirname $( dirname "$PERF_DIR" ))
 
 BUILD_DIR="$CCF_DIR"/build
 
@@ -20,7 +20,7 @@ python3 loggin_generator.py
 echo -e "\n$CHECK_DELIMITER"
 echo -e "-Run Submitter\n"
 cd "$BUILD_DIR"
-./submit --cert ./workspace/sandbox_common/user0_cert.pem --key ./workspace/sandbox_common/user0_privk.pem --cacert ./workspace/sandbox_common/service_cert.pem --generator-filepath ../perf-system/generator/new_raw.parquet --pipeline
+./submit --cert ./workspace/sandbox_common/user0_cert.pem --key ./workspace/sandbox_common/user0_privk.pem --cacert ./workspace/sandbox_common/service_cert.pem --generator-filepath ../tests/perf-system/generator/new_raw.parquet --pipeline
 
 echo -e "\n$CHECK_DELIMITER"
 echo -e "--Run analyzer\n"
