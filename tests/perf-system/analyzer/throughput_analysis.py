@@ -1,14 +1,16 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the Apache 2.0 License.
 
-import analyzer as an
+import analyzer
 
-df_sends = an.get_df_from_parquet_file("../submitter/cpp_send.parquet")
-df_responses = an.get_df_from_parquet_file("../submitter/cpp_respond.parquet")
+analysis = analyzer.Analyze()
 
-successful_percent = an.iter_for_success_and_latency(df_sends, df_responses)
+df_sends = analysis.get_df_from_parquet_file("../submitter/cpp_send.parquet")
+df_responses = analysis.get_df_from_parquet_file("../submitter/cpp_respond.parquet")
 
-time_spent = an.total_time_in_sec(df_sends, df_responses)
+successful_percent = analysis.iter_for_success_and_latency(df_sends, df_responses)
+
+time_spent = analysis.total_time_in_sec(df_sends, df_responses)
 
 col_names = ["Reqs", "Time", "Pass", "Throughput"]
 rows = [
@@ -19,9 +21,9 @@ rows = [
         round(len(df_sends.index) / time_spent, 1),
     ]
 ]
-my_table = an.customize_table(col_names, rows)
+my_table = analysis.customize_table(col_names, rows)
 
 print(my_table)
-an.plot_throughput_per_block(df_responses, 0.1)
+analysis.plot_throughput_per_block(df_responses, 0.1)
 
-an.plot_latency_distribution(0.1)
+analysis.plot_latency_distribution(0.1)

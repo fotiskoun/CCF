@@ -7,7 +7,7 @@ _Analysis_
 
 The folder containing each these components is the **CCF/tests/perf-system**
 
-The required Python packages are included inside the the  **CCF/tests/perf-system/requirements.txt** and can be installed running the following command from the **CCF/tests/perf-system** directory.
+The required Python packages are included inside the the **CCF/tests/perf-system/requirements.txt** and can be installed running the following command from the **CCF/tests/perf-system** directory.
 
 ```sh
 pip install -r requirements.txt
@@ -28,6 +28,7 @@ python3 generator.py
 By default, the generator will create a .parquet file, which is necessary for the following component, using the configurations provided. To provide another configuration file please use the following options:
 
 ### Optional arguments:
+
 - `-h, --help`: show this help message and exit
 - `-hs HOST, --host HOST`: The host to submit the request. (default: 127.0.0.1:8000)
 - `-p PATH, --path PATH`: The relative path to submit the request. (default: /app/log/private)
@@ -38,11 +39,12 @@ By default, the generator will create a .parquet file, which is necessary for th
 - `-ct CONTENT_TYPE, --content_type CONTENT_TYPE`: The Content-Type representation header is used to indicate the original media type of the resource. (default: application-json)
 - `-d DATA, --data DATA`: A string with the data to be sent with a request (default: {"id": 1, "msg": "Send message with id 1"})
 
-This component consists of different files including the **CCF/tests/perf-system/Generator/loggin_generator.py**, which is an alternative of the command line options, providing more flexibility to the user in order to create his own more complex requests. There exist some samples, creating an object to initialize a dataframe and call `append()` function to add requests specified by the arguments given to the dataframe. The `append()` function returns the last batch of requests created as a dataframe in order to create more requests based on the already appended. 
+This component consists of different files including the **CCF/tests/perf-system/Generator/loggin_generator.py**, which is an alternative of the command line options, providing more flexibility to the user in order to create his own more complex requests. There exist some samples, creating an object to initialize a dataframe and call `append()` function to add requests specified by the arguments given to the dataframe. The `append()` function returns the last batch of requests created as a dataframe in order to create more requests based on the already appended.
 All requests in the end should be followed by the `to_parquet_file()` function in order to generate the parquet file.
 You can either edit **CCF/tests/perf-system/Generator/loggin_generator.py** or create your own file in the same directory calling functions from the **CCF/tests/perf-system/Generator/generator.py** in order to construct your own series of requests.
 
 <a id="submitter"></a>
+
 ## Submitter
 
 In the **CCF/tests/perf-system/submitter** there are two submitter components one written in C++ language and a simpler in Python.
@@ -69,6 +71,7 @@ You should change the `-DCOMPILE_TARGET` to virtual if you are not running under
 You can provide certification files or configure import/export files by replacing `-manual_configurations` in the latest command with one or more of the following options, providing after each option the corresponding argument (where necessary).
 
 ### Optional arguments:
+
 - `-h,--help`: Print this help message and exit
 - `--cert`: Use the provided certificate file when working with a SSL-based protocol.
 - `--key`: Specify the path to the file containing the private key.
@@ -90,6 +93,7 @@ python3 submitter.py
 When running the submitter you have the following options to configure the submitter:
 
 ### Optional arguments:
+
 - `-h, --help`: Show this help message and exit
 - `-ca CACERT, --cacert CACERT`: Use the specified file for certificate verification.
 - `-c CERT, --cert CERT`: Use the provided certificate file when working with a SSL-based protocol.
@@ -113,6 +117,7 @@ python3 analysis.py
 You have the following options to specify the exported files:
 
 ### Optional arguments:
+
 - `-h, --help`: Show this help message and exit
 - `-sf SEND_FILE_PATH, --send_file_path SEND_FILE_PATH`: Path to the parquet file that contains the submitted requests (default: ../submitter/cpp_send.parquet)
 - `-rf RESPONSE_FILE_PATH, --response_file_path RESPONSE_FILE_PATH`: Path to the parquet file that contains the responses from the submitted requests (default: ../submitter/cpp_respond.parquet)
