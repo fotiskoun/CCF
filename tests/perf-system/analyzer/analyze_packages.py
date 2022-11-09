@@ -30,9 +30,19 @@ def main():
         default="../submitter/cpp_respond.parquet",
         type=str,
     )
+    parser.add_argument(
+        "-gf",
+        "--generator_file_path",
+        help="Path to the parquet file that contains the requests\
+            that are generated",
+        default="../generator/new_raw.parquet",
+        type=str,
+    )
 
     args = parser.parse_args()
-    analyzer.default_analysis(args.send_file_path, args.response_file_path)
+    analyzer.default_analysis(
+        args.send_file_path, args.response_file_path, args.generator_file_path
+    )
 
 
 if __name__ == "__main__":
