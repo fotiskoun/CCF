@@ -109,8 +109,4 @@ PYTHONPATH=./tests git ls-files tests/ python// | grep -e '\.py$' | xargs python
 
 echo "$CHECK_DELIMITER"
 echo "-- Python types"
-<<<<<<< HEAD
-git ls-files python// | grep -e '\.py$' | xargs mypy
-=======
 git ls-files python/ | grep -e '\.py$' | xargs mypy --implicit-optional
->>>>>>> main

@@ -6,6 +6,7 @@ set -e
 
 PERF_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
+# shellcheck disable=SC2046
 CCF_DIR=$(dirname $( dirname "$PERF_DIR" ))
 
 BUILD_DIR="$CCF_DIR"/build
