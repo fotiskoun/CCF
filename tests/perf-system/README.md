@@ -22,7 +22,7 @@ After that, run your CCF system.
 Inside the **CCF/tests/perf-system/generator** exists the generator component and you can execute it from this directory with the following command:
 
 ```sh
-python3 generator.py
+python3 generate_packages.py
 ```
 
 By default, the generator will create a .parquet file, which is necessary for the following component, using the configurations provided. To provide another configuration file please use the following options:
@@ -72,15 +72,15 @@ You can provide certification files or configure import/export files by replacin
 
 ### Optional arguments:
 
-- `-h,--help`: Print this help message and exit
-- `--cert`: Use the provided certificate file when working with a SSL-based protocol.
-- `--key`: Specify the path to the file containing the private key.
-- `--cacert`: Use the specified file for certificate verification.
-- `--server-address`: Specify the address to submit requests. (default: 127.0.0.1:8000)
-- `--send-filepath`: Path to parquet file to store the submitted requests. (default: ../tests/perf-system/submitter/cpp_send.parquet)
-- `--response-filepath`: Path to parquet file to store the responses from the submitted requests. (default: ../tests/perf-system/submitter/cpp_respond.parquet)
-- `--generator-filepath`: Path to parquet file with the generated requests to be submitted. (default: ../tests/perf-system/generator/requests.parquet)
-- `--pipeline`: Enable HTTP/1.1 pipelining option.
+- ``-h,--help``: Print this help message and exit
+- ``-c,--cert``: Use the provided certificate file when working with a SSL-based protocol.
+- ``-k,--key``: Specify the path to the file containing the private key.
+- ``--cacert``: Use the specified file for certificate verification.
+- ``-a,--server-address``: Specify the address to submit requests. (default: 127.0.0.1:8000)
+- ``-s,--send-filepath``: Path to parquet file to store the submitted requests. (REQUIRED)
+- ``-r,--response-filepath``: Path to parquet file to store the responses from the submitted  requests. (REQUIRED)
+- ``-g,--generator-filepath``: Path to parquet file with the generated requests to be submitted. (REQUIRED)
+- ``-m,--max-inflight-requests``: Specifies the number of outstanding requests sent to the server while waiting for response. When this options is set to 0 there will be no pipelining. Any other value will enable pipelining. A positive value will specify a window of outstanding requests on the server while waiting for a response. -1 or a negative value will set the window of outstanding requests to maximum i.e. submit requests without waiting for a response. (default: 0)
 
 ### Python
 
