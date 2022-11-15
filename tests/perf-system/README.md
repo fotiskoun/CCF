@@ -72,15 +72,15 @@ You can provide certification files or configure import/export files by replacin
 
 ### Optional arguments:
 
-- ``-h,--help``: Print this help message and exit
-- ``-c,--cert``: Use the provided certificate file when working with a SSL-based protocol.
-- ``-k,--key``: Specify the path to the file containing the private key.
-- ``--cacert``: Use the specified file for certificate verification.
-- ``-a,--server-address``: Specify the address to submit requests. (default: 127.0.0.1:8000)
-- ``-s,--send-filepath``: Path to parquet file to store the submitted requests. (REQUIRED)
-- ``-r,--response-filepath``: Path to parquet file to store the responses from the submitted  requests. (REQUIRED)
-- ``-g,--generator-filepath``: Path to parquet file with the generated requests to be submitted. (REQUIRED)
-- ``-m,--max-inflight-requests``: Specifies the number of outstanding requests sent to the server while waiting for response. When this options is set to 0 there will be no pipelining. Any other value will enable pipelining. A positive value will specify a window of outstanding requests on the server while waiting for a response. -1 or a negative value will set the window of outstanding requests to maximum i.e. submit requests without waiting for a response. (default: 0)
+- `-h,--help`: Print this help message and exit
+- `-c,--cert`: Use the provided certificate file when working with a SSL-based protocol.
+- `-k,--key`: Specify the path to the file containing the private key.
+- `--cacert`: Use the specified file for certificate verification.
+- `-a,--server-address`: Specify the address to submit requests. (default: 127.0.0.1:8000)
+- `-s,--send-filepath`: Path to parquet file to store the submitted requests. (REQUIRED)
+- `-r,--response-filepath`: Path to parquet file to store the responses from the submitted requests. (REQUIRED)
+- `-g,--generator-filepath`: Path to parquet file with the generated requests to be submitted. (REQUIRED)
+- `-m,--max-inflight-requests`: Specifies the number of outstanding requests sent to the server while waiting for response. When this options is set to 0 there will be no pipelining. Any other value will enable pipelining. A positive value will specify a window of outstanding requests on the server while waiting for a response. -1 or a negative value will set the window of outstanding requests to maximum i.e. submit requests without waiting for a response. (default: 0)
 
 ### Python
 
