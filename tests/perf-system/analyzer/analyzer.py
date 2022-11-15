@@ -130,6 +130,47 @@ class Analyze:
             custom_table.add_row(val_row)
         return custom_table
 
+    def plot_commits(self, df_responses: pd.DataFrame, df_generator: pd.DataFrame):
+        init_post_id = 0
+        init_time = 0
+        custom_header = "x-ms-ccf-transaction-id"
+        for head in df_responses.iloc[0]["rawResponse"].split("\n"):
+            if custom_header in head.split(":")[0]:
+                init_post_id = int(head.split(":")[1].split(".")[1][:-1]) - 1
+                init_time = float(df_responses.iloc[0]["receiveTime"])
+        post_ids = []
+        committed_ids = []
+        time_units = []
+        for row in range(len(df_generator.index)):
+            if df_generator.iloc[row]["request"].split(" ")[
+                0
+            ] == "GET" and df_generator.iloc[row]["request"].split(" ")[1].endswith(
+                "commit"
+            ):
+                res_headers = df_responses.iloc[row]["rawResponse"].split("\n")
+                for h in res_headers:
+                    if custom_header in h.split(":")[0]:
+                        post_ids.append(
+                            int(h.split(":")[1][:-1].split(".")[1]) - init_post_id
+                        )
+                committed_ids.append(
+                    int(res_headers[-1].split(":")[1][3:-2]) - init_post_id
+                )
+                time_units.append(
+                    float(df_responses.iloc[row]["receiveTime"]) - init_time
+                )
+        # print(init_post_id)
+        # print(post_ids)
+        # print(committed_ids)
+        # print(time_units)
+        plt.figure()
+        plt.plot(post_ids, time_units, label="posts")
+        plt.plot(committed_ids, time_units, label="commits")
+        plt.ylabel("Requests")
+        plt.xlabel("Time(s)")
+        plt.legend()
+        plt.savefig("posted_and_committed.png")
+
     def plot_latency_by_id(self, df_sends: pd.DataFrame) -> None:
         id_unit = [x for x in range(0, len(df_sends.index))]
         lat_unit = self.ms_latency_list
@@ -183,8 +224,6 @@ class Analyze:
         throughput_per_block = [
             x / time_block for x in req_per_block
         ]  # x/time_block comes from rule of three
-        print(req_per_block)
-        print(block_latency)
         plt.figure()
         plt.plot(block_latency, throughput_per_block)
         plt.ylabel("Throughput(req/s)")
