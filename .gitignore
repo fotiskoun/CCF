@@ -39,4 +39,3 @@ doc/operations/generated_config.rst
 tests/perf-system/submitter/*.pem
 *.parquet
 tests/perf-system/analyzer/*.png
-tests/perf-system/analyzer/*.txt
