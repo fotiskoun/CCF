@@ -38,7 +38,7 @@ If this is the first run of the CCF, the compilation commands are the following:
 If the compilation target is not sgx then replace it with ``virtual``. All the components including 
 the submitter should now be compiled under ``CCF/build`` directory.
 
-The manual_configurations on teh execution command should be replaced by calling all of most of 
+The manual_configurations on the execution command should be replaced by calling all or most of 
 the following arguments 
 
 * ``-h,--help``: Print this help message and exit
@@ -49,4 +49,9 @@ the following arguments
 * ``-s,--send-filepath``: Path to parquet file to store the submitted requests. *REQUIRED*
 * ``-r,--response-filepath``: Path to parquet file to store the responses from the submitted requests. *REQUIRED*
 * ``-g,--generator-filepath``: Path to parquet file with the generated requests to be submitted. *REQUIRED*
-* ``-m,--max-inflight-requests``: Specifies the number of outstanding requests sent to the server while waiting for response. When this options is set to 0 there will be no pipelining. Any other value will enable pipelining. A positive value will specify a window of outstanding requests on the server while waiting for a response. -1 or a negative value will set the window of outstanding requests to maximum i.e. submit requests without waiting for a response. *(default: 0)*
+* ``-m,--max-inflight-requests``: Specifies the number of outstanding requests sent to the server while waiting for a response. When this option is set to 0 there will be no pipelining. Any other value will enable pipelining. A positive value will specify a window of outstanding requests on the server while waiting for a response. -1 or a negative value will set the window of outstanding requests to maximum i.e. to submit requests without waiting for a response. *(default: 0)*
+
+Once the component finishes submitting and receiving responses for all the requests it 
+will then store the results into two ``.parquet`` files. Hence, the path to file with the 
+requests that were generated from the previous component, as well as the path to store 
+the submission results must be declared.
