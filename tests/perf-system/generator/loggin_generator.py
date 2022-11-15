@@ -9,8 +9,8 @@ REQUEST_CONTENT_TYPE = "content-type: application/json"
 msgs = Messages()
 
 # inputs = msgs.append(HOST, "/app/log/private/count", "GET")
-for i in range(99):
-    for i in range(1000):
+for i in range(20):
+    for i in range(500):
         msgs.append(
             HOST,
             "/app/log/private",
@@ -33,4 +33,4 @@ for i in range(99):
 # inputs = msgs.append(HOST, "/app/log/private/count", "GET")
 
 
-msgs.to_parquet_file("new_raw.parquet")
+msgs.to_parquet_file("medium_commit.parquet")

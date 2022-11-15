@@ -21,12 +21,12 @@ python3 loggin_generator.py
 echo -e "\n$CHECK_DELIMITER"
 echo -e "-Run Submitter\n"
 cd "$BUILD_DIR"
-./submit --cert ./workspace/sandbox_common/user0_cert.pem --key ./workspace/sandbox_common/user0_privk.pem --cacert ./workspace/sandbox_common/service_cert.pem --generator-filepath ../tests/perf-system/generator/new_raw.parquet --pipeline
+./submit --cert ./workspace/sandbox_common/user0_cert.pem --key ./workspace/sandbox_common/user0_privk.pem --cacert ./workspace/sandbox_common/service_cert.pem --generator-filepath ../tests/perf-system/generator/medium_commit.parquet -s ../tests/perf-system/submitter/medium_send.parquet -r ../tests/perf-system/submitter/medium_response.parquet -m -1
 
 echo -e "\n$CHECK_DELIMITER"
 echo -e "--Run analyzer\n"
 cd "$PERF_DIR"/analyzer
-python3 analyze_packages.py
+python3 commit_analysis.py
 
 echo -e "\n$CHECK_DELIMITER"
 echo "Finished sample performance tool successfully"
