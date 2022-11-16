@@ -151,6 +151,12 @@ class Analyze:
             ] == "GET" and df_generator.iloc[row]["request"].split(" ")[1].endswith(
                 "commit"
             ):
+                if (
+                    len(post_ids) > 1
+                    and post_ids[-1] == post_ids[-2]
+                    and post_ids[-1] == committed_ids[-1]
+                ):
+                    break
                 res_headers = df_responses.iloc[row]["rawResponse"].split("\n")
                 for h in res_headers:
                     if custom_header in h.split(":")[0]:
@@ -164,8 +170,8 @@ class Analyze:
                     (float(df_responses.iloc[row]["receiveTime"]) - init_time)
                 )
         plt.figure()
-        plt.plot(time_units, post_ids, label="Posts")
-        plt.plot(time_units, committed_ids, label="Commits")
+        plt.scatter(time_units, post_ids, label="Posts", marker="o")
+        plt.scatter(time_units, committed_ids, label="Commits", marker="+")
         plt.ylabel("Requests")
         plt.xlabel("Time(s)")
         plt.legend()

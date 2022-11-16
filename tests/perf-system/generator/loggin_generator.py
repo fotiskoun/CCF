@@ -10,7 +10,7 @@ msgs = Messages()
 
 # inputs = msgs.append(HOST, "/app/log/private/count", "GET")
 for i in range(20):
-    for i in range(500):
+    for i in range(50):
         msgs.append(
             HOST,
             "/app/log/private",
@@ -23,6 +23,7 @@ for i in range(20):
         )
     inputs = msgs.append(HOST, "/app/commit", "GET")
 
+inputs = msgs.append(HOST, "/app/commit", "GET", iterations=10000)
 
 # for i in range(300000):
 #     msgs.append(HOST, "/app/log/private?id=42", "GET")
@@ -33,4 +34,4 @@ for i in range(20):
 # inputs = msgs.append(HOST, "/app/log/private/count", "GET")
 
 
-msgs.to_parquet_file("medium_commit.parquet")
+msgs.to_parquet_file("small_commit_raw.parquet")
