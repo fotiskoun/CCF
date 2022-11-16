@@ -21,11 +21,13 @@ python3 loggin_generator.py
 echo -e "\n$CHECK_DELIMITER"
 echo -e "-Run Submitter\n"
 cd "$BUILD_DIR"
-./submit --cert ./workspace/sandbox_common/user0_cert.pem --key ./workspace/sandbox_common/user0_privk.pem --cacert ./workspace/sandbox_common/service_cert.pem \
---generator-filepath ../tests/perf-system/generator/small_commit_raw.parquet \
--s ../tests/perf-system/submitter/small_commit_send.parquet \
--r ../tests/perf-system/submitter/small_commit_response.parquet \
--m -1
+./submit --cert ./workspace/sandbox_common/user0_cert.pem \
+--key ./workspace/sandbox_common/user0_privk.pem \
+--cacert ./workspace/sandbox_common/service_cert.pem \
+--generator-filepath ../tests/perf-system/generator/100k_single_read.parquet \
+-s ../tests/perf-system/submitter/js_100k_single_read_send_sgx_m_1000.parquet \
+-r ../tests/perf-system/submitter/js_100k_single_read_response_sgx_m_1000.parquet \
+-m 1000
 
 echo -e "\n$CHECK_DELIMITER"
 echo -e "--Run analyzer\n"
