@@ -98,4 +98,3 @@ CCF Documentation
     contribute/index.rst
     architecture/index.rst
     research/index.rst
-    performance/index.rst
