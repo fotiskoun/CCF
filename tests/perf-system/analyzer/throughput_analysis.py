@@ -5,14 +5,18 @@ import analyzer
 
 analysis = analyzer.Analyze()
 
-df_sends = analyzer.get_df_from_parquet_file("../submitter/cpp_send.parquet")
-df_responses = analyzer.get_df_from_parquet_file("../submitter/cpp_respond.parquet")
+df_sends = analyzer.get_df_from_parquet_file(
+    "../submitter/posts_commits_100x1000_send_sgx_m_1000.parquet"
+)
+df_responses = analyzer.get_df_from_parquet_file(
+    "../submitter/posts_commits_100x1000_response_sgx_m_1000.parquet"
+)
 
 successful_percent = analysis.iter_for_success_and_latency(df_sends, df_responses)
 
 time_spent = analysis.total_time_in_sec(df_sends, df_responses)
 
-col_names = ["Reqs", "Time", "Pass", "Throughput"]
+col_names = ["Reqs", "Time(s)", "Pass", "Throughput(req/s)"]
 rows = [
     [
         len(df_sends.index),

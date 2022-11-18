@@ -6,11 +6,13 @@ import analyzer
 analysis = analyzer.Analyze()
 
 df_generator = analyzer.get_df_from_parquet_file(
-    "../generator/small_commit_raw.parquet"
+    "../generator/posts_commits_100x1000.parquet"
 )
-df_sends = analyzer.get_df_from_parquet_file("../submitter/small_commit_send.parquet")
+df_sends = analyzer.get_df_from_parquet_file(
+    "../submitter/posts_commits_100x1000_send_virt_m_1000.parquet"
+)
 df_responses = analyzer.get_df_from_parquet_file(
-    "../submitter/small_commit_response.parquet"
+    "../submitter/posts_commits_100x1000_response_virt_m_100.parquet"
 )
 
 
