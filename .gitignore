@@ -39,3 +39,6 @@ doc/operations/generated_config.rst
 tests/perf-system/submitter/*.pem
 *.parquet
 tests/perf-system/analyzer/*.png
+**/.ipynb_checkpoints
+**/*.ipynb
+tests/.ipynb_checkpoints
