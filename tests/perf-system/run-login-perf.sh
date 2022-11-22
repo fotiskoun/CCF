@@ -24,10 +24,10 @@ cd "$BUILD_DIR"
 ./submit --cert ./workspace/sandbox_common/user0_cert.pem \
 --key ./workspace/sandbox_common/user0_privk.pem \
 --cacert ./workspace/sandbox_common/service_cert.pem \
---generator-filepath ../tests/perf-system/generator/demo.parquet \
--s ../tests/perf-system/submitter/demo_send.parquet \
--r ../tests/perf-system/submitter/demo_response.parquet \
--m -1
+--generator-filepath ../tests/perf-system/generator/100k_single_read.parquet \
+-s ../tests/perf-system/submitter/100k_single_read_send_sgx_m_1000.parquet \
+-r ../tests/perf-system/submitter/100k_single_read_response_sgx_m_1000.parquet \
+-m 1000
 
 echo -e "\n$CHECK_DELIMITER"
 echo -e "--Run analyzer\n"

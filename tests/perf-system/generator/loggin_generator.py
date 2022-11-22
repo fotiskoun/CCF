@@ -9,14 +9,22 @@ REQUEST_CONTENT_TYPE = "content-type: application/json"
 msgs = Messages()
 
 for i in range(100):
-    msgs.append(
-        HOST,
-        "/app/log/private",
-        "POST",
-        data='{"id": ' + str(i) + ', "msg": "Logged ' + str(i) + ' to private table"}',
-    )
+    for i in range(1000):
+        msgs.append(
+            HOST,
+            "/app/log/private",
+            "POST",
+            data='{"id": '
+            + str(i % 100)
+            + ', "msg": "Logged '
+            + str(i)
+            + ' to private table"}',
+        )
+    msgs.append(HOST, "/app/commit", "GET")
 
-msgs.append(HOST, "/app/log/private?id=1", "GET", iterations=1000)
+msgs.append(HOST, "/app/commit", "GET", iterations=10000)
+
+# msgs.append(HOST, "/app/log/private?id=1", "GET", iterations=1000)
 
 
-msgs.to_parquet_file("demo.parquet")
+msgs.to_parquet_file("posts_commits_100x1000.parquet")
