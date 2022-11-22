@@ -154,45 +154,28 @@ class Analyze:
                 if (
                     len(post_ids) > 1
                     and post_ids[-1] == post_ids[-2]
-                    and post_ids[-1] == committed_ids[-1] - 1
+                    and post_ids[-1] == committed_ids[-1]
                 ):
                     break
                 res_headers = df_responses.iloc[row]["rawResponse"].split("\n")
                 for h in res_headers:
                     if custom_header in h.split(":")[0]:
                         post_ids.append(
-                            (int(h.split(":")[1][:-1].split(".")[1]) - init_post_id)/1000
+                            int(h.split(":")[1][:-1].split(".")[1]) - init_post_id
                         )
-                if len(post_ids) <= len(time_units):
-                    res_headers_prev = df_responses.iloc[row - 1]["rawResponse"].split(
-                        "\n"
-                    )
-                    len_post = len(post_ids)
-                    for h in res_headers_prev:
-                        if custom_header in h.split(":")[0]:
-                            post_ids.append(
-                                (int(h.split(":")[1].split(".")[1]) - init_post_id)/1000
-                            )
-                    if (len_post) == len(post_ids):
-                        post_ids.append(post_ids[-1]/1000)
                 committed_ids.append(
-                    (int(res_headers[-1].split(":")[1][3:-2]) - init_post_id)/1000
+                    int(res_headers[-1].split(":")[1][3:-2]) - init_post_id
                 )
                 time_units.append(
                     (float(df_responses.iloc[row]["receiveTime"]) - init_time)
                 )
         plt.figure()
-        plt.rc('legend', fontsize=16) 
-        plt.rc('axes', labelsize=16) 
         plt.scatter(time_units, post_ids, label="Posts", marker="o")
         plt.scatter(time_units, committed_ids, label="Commits", marker="+")
-        plt.ylabel("Requests (x1000)")
+        plt.ylabel("Requests")
         plt.xlabel("Time(s)")
-        plt.subplots_adjust(left=0.15)
         plt.legend()
-        plt.xlim([0, 1])
-        plt.ylim([0, 51])
-        plt.savefig("posted_vs_committed.png", dpi=300)
+        plt.savefig("posted_vs_committed.png")
 
     def plot_latency_by_id(self, df_sends: pd.DataFrame) -> None:
         id_unit = [x for x in range(0, len(df_sends.index))]
@@ -207,21 +190,15 @@ class Analyze:
         time_unit = [
             x - df_responses["receiveTime"][0] + 1 for x in df_responses["receiveTime"]
         ]
-        
         plt.figure()
-        plt.rc('legend', fontsize=16)
-        plt.rc('axes', labelsize=16) 
-        plt.scatter(time_unit, self.ms_latency_list, s=1, label="GET")
+        plt.scatter(time_unit, self.ms_latency_list, s=1)
         plt.ylabel("Latency(ms)")
-        plt.xlabel("Time(s)")
-        plt.xlim([0, 112])
-        plt.legend()
-
-        plt.savefig("latency_across_time.png", dpi=300)
+        plt.xlabel("time(s)")
+        plt.savefig("latency_across_time.png")
 
     def plot_throughput_per_block(
         self, df_responses: pd.DataFrame, time_block: float
-    ) -> List:
+    ) -> None:
         """
         It splits the dataset in buckets of time_block seconds difference
         and will plot the throughput for each bucket
@@ -242,21 +219,20 @@ class Analyze:
             for i in range(len(block_indexes) - 1):
                 req_per_block.append(block_indexes[i + 1] - block_indexes[i])
                 # Assuming there are no 2 consecutive timestamps with difference > time_block
-                block_latency.append(time_block * (i + 1))
+                block_latency.append(time_block * SEC_MS * (i + 1))
             req_per_block.append(len(sorted_receive_times) - block_indexes[-1])
             block_latency.append(
                 block_latency[-1]
-                + int((sorted_receive_times[-1] - time_block_comparator))
+                + int((sorted_receive_times[-1] - time_block_comparator) * SEC_MS)
             )
         throughput_per_block = [
-            x / time_block /1000 for x in req_per_block
-        ]  # x/time_block comes from rule of three and /1000 for kreq/s 
-        return [block_latency[:-1], throughput_per_block[:-1]]
+            x / time_block for x in req_per_block
+        ]  # x/time_block comes from rule of three
         plt.figure()
-        plt.plot(block_latency[:-1], throughput_per_block[:-1])
+        plt.plot(block_latency, throughput_per_block)
         plt.ylabel("Throughput(req/s)")
         plt.xlabel("time(ms)")
-        plt.savefig("throughput_across_time.png", dpi=300)
+        plt.savefig("throughput_across_time.png")
 
     def plot_latency_distribution(self, ms_separator: float, highest_vals=15):
         """

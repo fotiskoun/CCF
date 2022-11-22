@@ -67,7 +67,7 @@ df_sends_post_small_virt_m1000 = analyzer.get_df_from_parquet_file(
     "../submitter/posts_small_message_100k_send_virt_m_1000.parquet"
 )
 df_responses_post_small_virt_m1000 = analyzer.get_df_from_parquet_file(
-    "../submitter/posts_small_message_100k_response_virt_m_100.parquet"
+    "../submitter/posts_small_message_100k_response_virt_m_1000.parquet"
 )
 analysis_post_small_virt_m1000 = analyzer.Analyze()
 
@@ -84,7 +84,7 @@ df_sends_post_large_virt_m1000 = analyzer.get_df_from_parquet_file(
     "../submitter/posts_large_message_100k_send_virt_m_1000.parquet"
 )
 df_responses_post_large_virt_m1000 = analyzer.get_df_from_parquet_file(
-    "../submitter/posts_large_message_100k_response_virt_m_100.parquet"
+    "../submitter/posts_large_message_100k_response_virt_m_1000.parquet"
 )
 analysis_post_large_virt_m1000 = analyzer.Analyze()
 
@@ -96,15 +96,15 @@ df_sends_posts_commits_virt_m1000 = analyzer.get_df_from_parquet_file(
     "../submitter/posts_commits_100x1000_send_virt_m_1000.parquet"
 )
 df_responses_posts_commits_virt_m1000 = analyzer.get_df_from_parquet_file(
-    "../submitter/posts_commits_100x1000_response_virt_m_100.parquet"
+    "../submitter/posts_commits_100x1000_response_virt_m_1000.parquet"
 )
-analysis_post_large_virt_m1000 = analyzer.Analyze()
+analysis_post_commits_large_virt_m1000 = analyzer.Analyze()
 
-## PLOT POSTS vs COMMITS WINDOW START
-# analysis_post_large_virt_m1000.plot_commits(
-#     df_responses_posts_commits_virt_m1000, df_generator_posts_commits
-# )
-## PLOT POSTS vs COMMITS WINDOW FIN
+# PLOT POSTS vs COMMITS WINDOW START
+analysis_post_commits_large_virt_m1000.plot_commits(
+    df_responses_posts_commits_virt_m1000, df_generator_posts_commits
+)
+# PLOT POSTS vs COMMITS WINDOW FIN
 
 # success_post_small_virt_m0 = analysis_post_small_virt_m0.iter_for_success_and_latency(
 #     df_sends_post_small_virt_m0, df_responses_post_small_virt_m0
@@ -135,27 +135,31 @@ sgx_0 = analysis_sgx_m0.plot_throughput_per_block(df_responses_sgx_m0, 0.5)
 sgx_1000 = analysis_sgx_m1000.plot_throughput_per_block(df_responses_sgx_m1000, 0.05)
 
 plt.figure()
-plt.plot(virt_m1000[0][:-1], virt_m1000[1][:-1], label="virtual m=1000")
-plt.plot(sgx_1000[0][:-1], sgx_1000[1][:-1], label="sgx m=1000")
-plt.ylabel("Throughput(req/s)")
+plt.rc('legend', fontsize=16)
+plt.rc('axes', labelsize=16) 
+plt.plot(virt_m1000[0][1:-1], virt_m1000[1][1:-1], label="virtual")
+plt.plot(sgx_1000[0][1:-1], sgx_1000[1][1:-1], label="sgx")
+plt.ylabel("Throughput(kreq/s)")
 plt.xlabel("Time(s)")
 # plt.xscale("log")
-plt.ylim([0, 105000])
+plt.ylim([0, 105])
 plt.xlim([0, 3.5])
 plt.legend()
 plt.tight_layout()
 
 plt.savefig("virt_sgx_m1000_throughput_across_time.png", dpi=300)
 # plt.figure(2)
+# plt.rc('legend', fontsize=16)
+# plt.rc('axes', labelsize=16) 
 
-# plt.plot(virt_m0[0], virt_m0[1], label="virtual m=0")
-# plt.plot(sgx_0[0], sgx_0[1], label="sgx m=0")
-# plt.ylabel("Throughput(req/s)")
+# plt.plot(virt_m0[0][:-1], virt_m0[1][:-1], label="virtual m=0")
+# plt.plot(sgx_0[0][:-1], sgx_0[1][:-1], label="sgx m=0")
+# plt.ylabel("Throughput(kreq/s)")
 # plt.xlabel("Time(s)")
 # # plt.xscale("log")
 # plt.legend()
 # plt.tight_layout()
-# plt.ylim([0, 105000])
+# plt.ylim([0, 105])
 # plt.xlim([0, 115])
 
 # plt.savefig("virt_sgx_m0_throughput_across_time.png", dpi=300)
@@ -164,27 +168,37 @@ plt.savefig("virt_sgx_m1000_throughput_across_time.png", dpi=300)
 
 
 # PLOT GET THROUGHPUT JS AND C++ START
-# js_virt_m1000 = js_analysis_virt_m1000.plot_throughput_per_block(
-#     js_df_responses_virt_m1000, 0.05
+
+# js_df_responses_sgx_m1000 = analyzer.get_df_from_parquet_file(
+#     "../submitter/js_100k_single_read_response_sgx_m_1000.parquet"
 # )
-# virt_m1000 = analysis_virt_m1000.plot_throughput_per_block(
-#     df_responses_virt_m1000, 0.05
+# js_analysis_sgx_m1000 = analyzer.Analyze()
+
+# js_sgx_m1000 = js_analysis_sgx_m1000.plot_throughput_per_block(
+#     js_df_responses_sgx_m1000, 0.05
+# )
+
+# sgx_m1000 = analysis_sgx_m1000.plot_throughput_per_block(
+#     df_responses_sgx_m1000, 0.05
 # )
 
 # plt.figure()
-# plt.plot(js_virt_m1000[0][:-1], js_virt_m1000[1][:-1], label="JS")
-# plt.plot(virt_m1000[0][:-1], virt_m1000[1][:-1], label="C++")
-# plt.ylabel("Throughput(req/s)")
+# plt.rc('legend', fontsize=16)
+# plt.rc('axes', labelsize=16) 
+# plt.plot(sgx_m1000[0][1:-1], sgx_m1000[1][1:-1], label="C++")
+# plt.plot(js_sgx_m1000[0][1:-1], js_sgx_m1000[1][1:-1], label="JS")
+# plt.ylabel("Throughput(kreq/s)")
 # plt.xlabel("Time(s)")
-# plt.xlim([0, 24])
+# plt.xlim([0, 3.5])
+# plt.ylim([0, 35])
 # plt.legend()
 # plt.tight_layout()
 
-# plt.savefig("c++_js+virt_m1000_throughput_across_time.png", dpi=300)
+# plt.savefig("c++_js+_sgx_m1000_throughput_across_time.png", dpi=300)
 # PLOT GET THROUGHPUT JS AND C++ FIN
 
 
-#### PLOT POST SMALL vs LARGE START
+#### PLOT VIRTUAL POST SMALL vs LARGE START
 # virt1000_small = analysis_post_small_virt_m1000.plot_throughput_per_block(
 #     df_responses_post_small_virt_m1000, 0.05
 # )
@@ -195,16 +209,60 @@ plt.savefig("virt_sgx_m1000_throughput_across_time.png", dpi=300)
 # )
 # plt.figure()
 
-# plt.plot(virt1000_small[0], virt1000_small[1], label="small")
-# plt.plot(virt1000_large[0], virt1000_large[1], label="large")
-# plt.ylabel("Throughput(req/s)")
+# plt.rc('legend', fontsize=16) 
+# plt.rc('axes', labelsize=16) 
+# plt.plot(virt1000_small[0][:-1], virt1000_small[1][:-1], label="small")
+# plt.plot(virt1000_large[0][:-1], virt1000_large[1][:-1], label="large")
+# plt.ylabel("Throughput(kreq/s)")
 # plt.xlabel("Time(s)")
 # plt.legend()
 # plt.xlim([0, 5.5])
+# plt.ylim([0, 51])
 # plt.tight_layout()
 
 # plt.savefig("post_small_large_virtual_m1000_throughput_across_time.png", dpi=300)
-#### PLOT POST SMALL vs LARGE FIN
+#### PLOT POST VIRTUAL SMALL vs LARGE FIN
+
+#### PLOT SGX POST SMALL vs LARGE START
+# df_sends_post_small_sgx_m1000 = analyzer.get_df_from_parquet_file(
+#     "../submitter/posts_small_message_100k_send_sgx_m_1000.parquet"
+# )
+# df_responses_post_small_sgx_m1000 = analyzer.get_df_from_parquet_file(
+#     "../submitter/posts_small_message_100k_response_sgx_m_1000.parquet"
+# )
+# analysis_post_small_sgx_m1000 = analyzer.Analyze()
+
+# df_sends_post_large_sgx_m1000 = analyzer.get_df_from_parquet_file(
+#     "../submitter/posts_large_message_100k_send_sgx_m_1000.parquet"
+# )
+# df_responses_post_large_sgx_m1000 = analyzer.get_df_from_parquet_file(
+#     "../submitter/posts_large_message_100k_response_sgx_m_1000.parquet"
+# )
+# analysis_post_large_sgx_m1000 = analyzer.Analyze()
+
+# sgx1000_small = analysis_post_small_sgx_m1000.plot_throughput_per_block(
+#     df_responses_post_small_sgx_m1000, 0.05
+# )
+
+
+# sgx1000_large = analysis_post_large_sgx_m1000.plot_throughput_per_block(
+#     df_responses_post_large_sgx_m1000, 0.05
+# )
+# plt.figure()
+
+# plt.rc('legend', fontsize=16) 
+# plt.rc('axes', labelsize=16) 
+# plt.plot(sgx1000_small[0][1:-3], sgx1000_small[1][1:-3], label="small")
+# plt.plot(sgx1000_large[0][1:-3], sgx1000_large[1][1:-3], label="large")
+# plt.ylabel("Throughput(kreq/s)")
+# plt.xlabel("Time(s)")
+# plt.legend()
+# plt.xlim([0, 10.2])
+# plt.ylim([0, 18])
+# plt.tight_layout()
+
+# plt.savefig("post_small_large_sgx_m1000_throughput_across_time.png", dpi=300)
+#### PLOT POST SGX SMALL vs LARGE FIN
 
 # LATENCY POSTS START
 # s = analysis_post_small_virt_m0.iter_for_success_and_latency(
