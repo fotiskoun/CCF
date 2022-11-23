@@ -229,10 +229,11 @@ class Analyze:
             x / time_block for x in req_per_block
         ]  # x/time_block comes from rule of three
         plt.figure()
-        plt.plot(block_latency, throughput_per_block)
+        plt.plot(block_latency[1:-2], throughput_per_block[1:-2])
+        plt.ylim([0,105000])
         plt.ylabel("Throughput(req/s)")
-        plt.xlabel("time(ms)")
-        plt.savefig("throughput_across_time.png")
+        plt.xlabel("Time(ms)")
+        plt.savefig("demo_throughput_across_time.png")
 
     def plot_latency_distribution(self, ms_separator: float, highest_vals=15):
         """
