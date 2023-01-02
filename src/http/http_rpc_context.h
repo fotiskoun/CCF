@@ -12,6 +12,28 @@
 
 namespace http
 {
+  inline std::vector<uint8_t> error(ccf::ErrorDetails&& error)
+  {
+    nlohmann::json body = ccf::ODataErrorResponse{
+      ccf::ODataError{std::move(error.code), std::move(error.msg)}};
+    const auto s = body.dump();
+
+    std::vector<uint8_t> data(s.begin(), s.end());
+    auto response = http::Response(error.status);
+
+    response.set_header(
+      http::headers::CONTENT_TYPE, http::headervalues::contenttype::JSON);
+    response.set_body(&data);
+
+    return response.build_response();
+  }
+
+  inline std::vector<uint8_t> error(
+    http_status status, const std::string& code, std::string&& msg)
+  {
+    return error({status, code, std::move(msg)});
+  }
+
   class HttpRpcContext : public ccf::RpcContextImpl
   {
   private:
@@ -72,13 +94,14 @@ namespace http
   public:
     HttpRpcContext(
       std::shared_ptr<ccf::SessionContext> s,
+      ccf::HttpVersion http_version,
       llhttp_method verb_,
       const std::string_view& url_,
       const http::HeaderMap& headers_,
       const std::vector<uint8_t>& body_,
       const std::shared_ptr<HTTPResponder>& responder_ = nullptr,
       const std::vector<uint8_t>& raw_request_ = {}) :
-      RpcContextImpl(s),
+      RpcContextImpl(s, http_version),
       verb(verb_),
       url(url_),
       request_headers(headers_),
@@ -301,6 +324,31 @@ namespace http
     }
     return actor;
   }
+
+  inline static std::shared_ptr<ccf::RpcHandler> fetch_rpc_handler(
+    std::shared_ptr<http::HttpRpcContext>& ctx,
+    std::shared_ptr<ccf::RPCMap>& rpc_map)
+  {
+    const auto actor_opt = http::extract_actor(*ctx);
+    std::optional<std::shared_ptr<ccf::RpcHandler>> search;
+    ccf::ActorsType actor = ccf::ActorsType::unknown;
+
+    if (actor_opt.has_value())
+    {
+      const auto& actor_s = actor_opt.value();
+      actor = rpc_map->resolve(actor_s);
+      search = rpc_map->find(actor);
+    }
+    if (
+      !actor_opt.has_value() || actor == ccf::ActorsType::unknown ||
+      !search.has_value())
+    {
+      // if there is no actor, proceed with the "app" as the ActorType and
+      // process the request
+      search = rpc_map->find(ccf::ActorsType::users);
+    }
+    return search.value();
+  }
 }
 
 namespace ccf
@@ -324,7 +372,14 @@ namespace ccf
     const auto& msg = processor.received.front();
 
     return std::make_shared<http::HttpRpcContext>(
-      s, msg.method, msg.url, msg.headers, msg.body, nullptr, packed);
+      s,
+      ccf::HttpVersion::HTTP1,
+      msg.method,
+      msg.url,
+      msg.headers,
+      msg.body,
+      nullptr,
+      packed);
   }
 
   inline std::shared_ptr<http::HttpRpcContext> make_fwd_rpc_context(

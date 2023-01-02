@@ -6,7 +6,7 @@ import time
 import logging
 from contextlib import contextmanager
 from enum import Enum, IntEnum, auto
-from infra.clients import CCFConnectionException, flush_info
+from infra.clients import flush_info
 import infra.path
 import infra.proc
 import infra.service_load
@@ -36,7 +36,7 @@ logging.getLogger("paramiko").setLevel(logging.WARNING)
 JOIN_TIMEOUT = 40
 
 # If it takes a node n seconds to call an election, how long should we wait for an election to succeed?
-DEFAULT_TIMEOUT_MULTIPLIER = 3
+DEFAULT_TIMEOUT_MULTIPLIER = 15
 
 COMMON_FOLDER = "common"
 
@@ -147,6 +147,7 @@ class Network:
         init_partitioner=False,
         version=None,
         service_load=None,
+        node_data_json_file=None,
     ):
         if existing_network is None:
             self.consortium = None
@@ -205,7 +206,9 @@ class Network:
             pass
 
         for host in self.hosts:
-            self.create_node(host, version=self.version)
+            self.create_node(
+                host, version=self.version, node_data_json_file=node_data_json_file
+            )
 
     def _get_next_local_node_id(self):
         next_node_id = self.next_node_id
@@ -958,8 +961,6 @@ class Network:
             flush_info(logs, log_capture, 0)
             raise PrimaryNotFound
 
-        flush_info(logs, log_capture, 0)
-
         return (self._get_node_by_service_id(primary_id), view)
 
     def find_backups(self, primary=None, timeout=3, log_capture=None):
@@ -1047,7 +1048,7 @@ class Network:
                 with node.client() as c:
                     logs[node.node_id] = []
                     resp = c.get(
-                        f"/node/local_tx?transaction_id={tx_id}",
+                        f"/node/tx?transaction_id={tx_id}",
                         log_capture=logs[node.node_id],
                     )
                     if resp.status_code != 200:
@@ -1161,18 +1162,6 @@ class Network:
         error = TimeoutError
         logs = []
 
-        backup = self.find_any_backup(old_primary)
-        if backup.get_consensus() == "BFT":
-            try:
-                with backup.client("user0") as c:
-                    _ = c.post(
-                        "/app/log/private",
-                        {"id": -1, "msg": "This is submitted to force a view change"},
-                    )
-                time.sleep(1)
-            except CCFConnectionException:
-                LOG.warning(f"Could not successfully connect to node {backup.node_id}.")
-
         while time.time() < end_time:
             try:
                 logs = []
@@ -1213,7 +1202,9 @@ class Network:
         while time.time() < end_time:
             try:
                 logs = []
-                new_primary, new_term = self.find_primary(nodes=nodes, log_capture=logs)
+                new_primary, new_term = self.find_primary(
+                    nodes=nodes, log_capture=logs, timeout=1
+                )
                 if new_primary.node_id in expected_node_ids:
                     flush_info(logs, None)
                     delay = time.time() - start_time
@@ -1233,39 +1224,44 @@ class Network:
         self, nodes=None, timeout_multiplier=DEFAULT_TIMEOUT_MULTIPLIER, min_view=None
     ):
         timeout = self.observed_election_duration * timeout_multiplier
-        LOG.info(f"Waiting up to {timeout}s for all nodes to agree on the primary")
+        LOG.info(
+            f"Waiting up to {timeout}s for all nodes to agree on the primary in view >= {min_view}"
+        )
         start_time = time.time()
         end_time = start_time + timeout
 
         nodes = nodes or self.get_joined_nodes()
-        primaries = []
+        primaries = {n.node_id: None for n in nodes}
         while time.time() < end_time:
-            primaries = []
             logs = []
             for node in nodes:
                 try:
-                    primary, view = self.find_primary(nodes=[node], log_capture=logs)
+                    primary, view = self.find_primary(
+                        nodes=[node], log_capture=logs, timeout=1
+                    )
                     if min_view is None or view > min_view:
-                        primaries.append(primary)
+                        primaries[node.node_id] = primary
                 except PrimaryNotFound:
-                    pass
+                    LOG.info(f"Primary not found for {node.node_id}")
             # Stop checking once all primaries are the same
-            if len(nodes) == len(primaries) and len(set(primaries)) <= 1:
+            if all(primaries.values()) and len(set(primaries.values())) == 1:
                 break
             time.sleep(0.1)
         flush_info(logs)
-        all_good = len(nodes) == len(primaries) and len(set(primaries)) <= 1
+        all_good = all(primaries.values()) and len(set(primaries.values())) == 1
         if not all_good:
             for node in nodes:
                 with node.client() as c:
                     r = c.get("/node/consensus")
                     pprint.pprint(r.body.json())
-        assert all_good, f"Multiple primaries: {primaries}"
+        primary_opinions = {n: p.node_id if p else p for n, p in primaries.items()}
+        assert all_good, f"Disagreement about primaries: {primary_opinions}"
         delay = time.time() - start_time
+        primary = list(primaries.values())[0]
         LOG.info(
-            f"Primary unanimity after {delay:.2f}s: {primaries[0].local_node_id} ({primaries[0].node_id})"
+            f"Primary unanimity after {delay:.2f}s: {primary.local_node_id} ({primary})"
         )
-        return primaries[0]
+        return primary
 
     def get_committed_snapshots(self, node, target_seqno=None, force_txs=True):
         # Wait for the snapshot including target_seqno to be committed before
@@ -1431,6 +1427,7 @@ def network(
     init_partitioner=False,
     version=None,
     service_load=None,
+    node_data_json_file=None,
 ):
     """
     Context manager for Network class.
@@ -1460,6 +1457,7 @@ def network(
         init_partitioner=init_partitioner,
         version=version,
         service_load=service_load,
+        node_data_json_file=node_data_json_file,
     )
     try:
         yield net

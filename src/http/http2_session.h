@@ -17,15 +17,18 @@ namespace http
   {
   protected:
     std::shared_ptr<ccf::TLSSession> tls_io;
+    std::shared_ptr<ErrorReporter> error_reporter;
     tls::ConnID session_id;
 
     HTTP2Session(
       tls::ConnID session_id_,
       ringbuffer::AbstractWriterFactory& writer_factory,
-      std::unique_ptr<tls::Context> ctx) :
+      std::unique_ptr<tls::Context> ctx,
+      const std::shared_ptr<ErrorReporter>& error_reporter = nullptr) :
       ccf::ThreadedSession(session_id_),
       tls_io(std::make_shared<ccf::TLSSession>(
         session_id_, writer_factory, std::move(ctx))),
+      error_reporter(error_reporter),
       session_id(session_id_)
     {}
 
@@ -99,23 +102,142 @@ namespace http
   {
   private:
     http2::StreamId stream_id;
-    http2::ServerParser& server_parser;
+
+    // Associated HTTP2ServerSession may be closed while responder is held
+    // elsewhere (e.g. async streaming) so keep a weak pointer to parser and
+    // report an error to caller to discard responder.
+    std::weak_ptr<http2::ServerParser> server_parser;
 
   public:
     HTTP2StreamResponder(
-      http2::StreamId stream_id_, http2::ServerParser& server_parser_) :
+      http2::StreamId stream_id_,
+      const std::shared_ptr<http2::ServerParser>& server_parser_) :
       stream_id(stream_id_),
       server_parser(server_parser_)
     {}
 
-    void send_response(
+    bool send_response(
       http_status status_code,
       http::HeaderMap&& headers,
       http::HeaderMap&& trailers,
       std::span<const uint8_t> body) override
     {
-      server_parser.respond(
-        stream_id, status_code, std::move(headers), std::move(trailers), body);
+      auto sp = server_parser.lock();
+      try
+      {
+        sp->respond(
+          stream_id,
+          status_code,
+          std::move(headers),
+          std::move(trailers),
+          body);
+      }
+      catch (const std::exception& e)
+      {
+        LOG_DEBUG_FMT(
+          "Error sending response on stream {}: {}", stream_id, e.what());
+        return false;
+      }
+
+      return true;
+    }
+
+    bool start_stream(
+      http_status status, const http::HeaderMap& headers) override
+    {
+      auto sp = server_parser.lock();
+      if (sp)
+      {
+        try
+        {
+          sp->start_stream(stream_id, status, headers);
+        }
+        catch (const std::exception& e)
+        {
+          LOG_DEBUG_FMT("Error sending headers {}: {}", stream_id, e.what());
+          return false;
+        }
+      }
+      else
+      {
+        LOG_DEBUG_FMT("Stream {} is closed", stream_id);
+        return false;
+      }
+      return true;
+    }
+
+    bool close_stream(http::HeaderMap&& trailers) override
+    {
+      auto sp = server_parser.lock();
+      if (sp)
+      {
+        try
+        {
+          sp->close_stream(stream_id, std::move(trailers));
+        }
+        catch (const std::exception& e)
+        {
+          LOG_DEBUG_FMT("Error closing stream {}: {}", stream_id, e.what());
+          return false;
+        }
+      }
+      else
+      {
+        LOG_DEBUG_FMT("Stream {} is closed", stream_id);
+        return false;
+      }
+      return true;
+    }
+
+    bool stream_data(std::span<const uint8_t> data) override
+    {
+      auto sp = server_parser.lock();
+      if (sp)
+      {
+        try
+        {
+          sp->send_data(stream_id, data);
+        }
+        catch (const std::exception& e)
+        {
+          LOG_DEBUG_FMT(
+            "Error streaming data on stream {}: {}", stream_id, e.what());
+          return false;
+        }
+      }
+      else
+      {
+        LOG_DEBUG_FMT("Stream {} is closed", stream_id);
+        return false;
+      }
+
+      return true;
+    }
+
+    bool set_on_stream_close_callback(StreamOnCloseCallback cb) override
+    {
+      auto sp = server_parser.lock();
+      if (sp)
+      {
+        try
+        {
+          sp->set_on_stream_close_callback(stream_id, cb);
+        }
+        catch (const std::exception& e)
+        {
+          LOG_DEBUG_FMT(
+            "Error setting close callback on stream {}: {}",
+            stream_id,
+            e.what());
+          return false;
+        }
+      }
+      else
+      {
+        LOG_DEBUG_FMT("Stream {} is closed", stream_id);
+        return false;
+      }
+      return true;
     }
   };
 
@@ -124,7 +246,7 @@ namespace http
                              public http::HTTPResponder
   {
   private:
-    http2::ServerParser server_parser;
+    std::shared_ptr<http2::ServerParser> server_parser;
 
     std::shared_ptr<ccf::RPCMap> rpc_map;
     std::shared_ptr<ccf::RpcHandler> handler;
@@ -166,6 +288,24 @@ namespace http
       return responder;
     }
 
+    void respond_with_error(
+      http2::StreamId stream_id, const ccf::ErrorDetails& error)
+    {
+      nlohmann::json body = ccf::ODataErrorResponse{
+        ccf::ODataError{std::move(error.code), std::move(error.msg)}};
+      const auto s = body.dump();
+
+      http::HeaderMap headers;
+      headers[http::headers::CONTENT_TYPE] =
+        http::headervalues::contenttype::JSON;
+
+      get_stream_responder(stream_id)->send_response(
+        error.status,
+        std::move(headers),
+        {},
+        {(const uint8_t*)s.data(), s.size()});
+    }
+
   public:
     HTTP2ServerSession(
       std::shared_ptr<ccf::RPCMap> rpc_map,
@@ -173,18 +313,17 @@ namespace http
       const ccf::ListenInterfaceID& interface_id,
       ringbuffer::AbstractWriterFactory& writer_factory,
       std::unique_ptr<tls::Context> ctx,
-      const http::ParserConfiguration&
-        configuration, // Note: Support configuration
+      const http::ParserConfiguration& configuration,
       const std::shared_ptr<ErrorReporter>& error_reporter,
-      http::ResponderLookup& responder_lookup_) // Note: Report errors
-      :
-      HTTP2Session(session_id_, writer_factory, std::move(ctx)),
-      server_parser(*this),
+      http::ResponderLookup& responder_lookup_) :
+      HTTP2Session(session_id_, writer_factory, std::move(ctx), error_reporter),
+      server_parser(
+        std::make_shared<http2::ServerParser>(*this, configuration)),
       rpc_map(rpc_map),
       interface_id(interface_id),
       responder_lookup(responder_lookup_)
     {
-      server_parser.set_outgoing_data_handler(
+      server_parser->set_outgoing_data_handler(
         [this](std::span<const uint8_t> data) {
           this->tls_io->send_raw(data.data(), data.size());
         });
@@ -199,29 +338,62 @@ namespace http
     {
       try
       {
-        server_parser.execute(data.data(), data.size());
+        if (!server_parser->execute(data.data(), data.size()))
+        {
+          // Close session gracefully
+          tls_io->close();
+          return false;
+        }
         return true;
+      }
+      catch (http::RequestPayloadTooLargeException& e)
+      {
+        if (error_reporter)
+        {
+          error_reporter->report_request_payload_too_large_error(session_id);
+        }
+
+        LOG_DEBUG_FMT("Request is too large: {}", e.what());
+
+        auto error = ccf::ErrorDetails{
+          HTTP_STATUS_PAYLOAD_TOO_LARGE,
+          ccf::errors::RequestBodyTooLarge,
+          e.what()};
+
+        respond_with_error(e.get_stream_id(), error);
+
+        tls_io->close();
+      }
+      catch (http::RequestHeaderTooLargeException& e)
+      {
+        if (error_reporter)
+        {
+          error_reporter->report_request_header_too_large_error(session_id);
+        }
+
+        LOG_DEBUG_FMT("Request header is too large: {}", e.what());
+
+        auto error = ccf::ErrorDetails{
+          HTTP_STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE,
+          ccf::errors::RequestHeaderTooLarge,
+          e.what()};
+
+        respond_with_error(e.get_stream_id(), error);
+
+        tls_io->close();
       }
       catch (const std::exception& e)
       {
+        if (error_reporter)
+        {
+          error_reporter->report_parsing_error(session_id);
+        }
+
         LOG_DEBUG_FMT("Error parsing HTTP request: {}", e.what());
 
-        http::HeaderMap headers;
-        headers[http::headers::CONTENT_TYPE] =
-          http::headervalues::contenttype::TEXT;
-
-        auto body = fmt::format(
-          "Unable to parse data as a HTTP request. Error details are "
-          "below.\n\n{}",
-          e.what());
-
-        // NB: If we have an error where we don't know a stream ID, we respond
-        // on the default stream
-        send_response(
-          HTTP_STATUS_BAD_REQUEST,
-          std::move(headers),
-          {},
-          {(const uint8_t*)body.data(), body.size()});
+        // For generic parsing errors, as it is not trivial to construct a valid
+        // HTTP/2 response to send back to the default stream (0), the session
+        // is simply closed.
 
         tls_io->close();
       }
@@ -251,6 +423,7 @@ namespace http
         {
           rpc_ctx = std::make_shared<HttpRpcContext>(
             session_ctx,
+            ccf::HttpVersion::HTTP2,
             verb,
             url,
             std::move(headers),
@@ -264,26 +437,10 @@ namespace http
             ccf::errors::InternalError,
             fmt::format("Error constructing RpcContext: {}", e.what())});
         }
+        std::shared_ptr<ccf::RpcHandler> search =
+          http::fetch_rpc_handler(rpc_ctx, rpc_map);
 
-        const auto actor_opt = http::extract_actor(*rpc_ctx);
-        std::optional<std::shared_ptr<ccf::RpcHandler>> search;
-        ccf::ActorsType actor = ccf::ActorsType::unknown;
-        if (actor_opt.has_value())
-        {
-          const auto& actor_s = actor_opt.value();
-          actor = rpc_map->resolve(actor_s);
-          search = rpc_map->find(actor);
-        }
-        if (
-          !actor_opt.has_value() || actor == ccf::ActorsType::unknown ||
-          !search.has_value())
-        {
-          // if there is no actor, proceed with the "app" as the ActorType and
-          // process the request
-          search = rpc_map->find(ccf::ActorsType::users);
-        }
-
-        search.value()->process(rpc_ctx);
+        search->process(rpc_ctx);
 
         if (rpc_ctx->response_is_pending)
         {
@@ -315,15 +472,39 @@ namespace http
       }
     }
 
-    void send_response(
+    bool send_response(
       http_status status_code,
       http::HeaderMap&& headers,
       http::HeaderMap&& trailers,
       std::span<const uint8_t> body) override
     {
-      get_stream_responder(http::DEFAULT_STREAM_ID)
+      return get_stream_responder(http2::DEFAULT_STREAM_ID)
         ->send_response(
           status_code, std::move(headers), std::move(trailers), body);
+    }
+
+    bool start_stream(
+      http_status status, const http::HeaderMap& headers) override
+    {
+      return get_stream_responder(http2::DEFAULT_STREAM_ID)
+        ->start_stream(status, headers);
+    }
+
+    bool stream_data(std::span<const uint8_t> data) override
+    {
+      return get_stream_responder(http2::DEFAULT_STREAM_ID)->stream_data(data);
+    }
+
+    bool close_stream(http::HeaderMap&& trailers) override
+    {
+      return get_stream_responder(http2::DEFAULT_STREAM_ID)
+        ->close_stream(std::move(trailers));
+    }
+
+    bool set_on_stream_close_callback(StreamOnCloseCallback cb) override
+    {
+      return get_stream_responder(http2::DEFAULT_STREAM_ID)
+        ->set_on_stream_close_callback(cb);
     }
   };
 

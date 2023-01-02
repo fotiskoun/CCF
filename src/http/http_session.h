@@ -120,7 +120,7 @@ namespace http
 
         return true;
       }
-      catch (RequestPayloadTooLarge& e)
+      catch (RequestPayloadTooLargeException& e)
       {
         if (error_reporter)
         {
@@ -136,7 +136,7 @@ namespace http
 
         tls_io->close();
       }
-      catch (RequestHeaderTooLarge& e)
+      catch (RequestHeaderTooLargeException& e)
       {
         if (error_reporter)
         {
@@ -175,7 +175,10 @@ namespace http
         response_body.insert(response_body.end(), data.begin(), data.end());
 
         send_response(
-          HTTP_STATUS_BAD_REQUEST, std::move(headers), {}, response_body);
+          HTTP_STATUS_BAD_REQUEST,
+          std::move(headers),
+          {},
+          std::move(response_body));
 
         tls_io->close();
       }
@@ -208,7 +211,12 @@ namespace http
         try
         {
           rpc_ctx = std::make_shared<HttpRpcContext>(
-            session_ctx, verb, url, std::move(headers), std::move(body));
+            session_ctx,
+            ccf::HttpVersion::HTTP1,
+            verb,
+            url,
+            std::move(headers),
+            std::move(body));
         }
         catch (std::exception& e)
         {
@@ -219,25 +227,10 @@ namespace http
           tls_io->close();
         }
 
-        const auto actor_opt = http::extract_actor(*rpc_ctx);
-        std::optional<std::shared_ptr<ccf::RpcHandler>> search;
-        ccf::ActorsType actor = ccf::ActorsType::unknown;
-        if (actor_opt.has_value())
-        {
-          const auto& actor_s = actor_opt.value();
-          actor = rpc_map->resolve(actor_s);
-          search = rpc_map->find(actor);
-        }
-        if (
-          !actor_opt.has_value() || actor == ccf::ActorsType::unknown ||
-          !search.has_value())
-        {
-          // if there is no actor, proceed with the "app" as the ActorType and
-          // process the request
-          search = rpc_map->find(ccf::ActorsType::users);
-        }
+        std::shared_ptr<ccf::RpcHandler> search =
+          http::fetch_rpc_handler(rpc_ctx, rpc_map);
 
-        search.value()->process(rpc_ctx);
+        search->process(rpc_ctx);
 
         if (rpc_ctx->response_is_pending)
         {
@@ -274,7 +267,7 @@ namespace http
       }
     }
 
-    void send_response(
+    bool send_response(
       http_status status_code,
       http::HeaderMap&& headers,
       http::HeaderMap&& trailers,
@@ -294,6 +287,28 @@ namespace http
 
       auto data = response.build_response();
       tls_io->send_raw(data.data(), data.size());
+      return true;
+    }
+
+    bool start_stream(
+      http_status status, const http::HeaderMap& headers) override
+    {
+      throw std::logic_error("Not implemented!");
+    }
+
+    bool stream_data(std::span<const uint8_t> data) override
+    {
+      throw std::logic_error("Not implemented!");
+    }
+
+    bool close_stream(http::HeaderMap&&) override
+    {
+      throw std::logic_error("Not implemented!");
+    }
+
+    bool set_on_stream_close_callback(StreamOnCloseCallback cb) override
+    {
+      throw std::logic_error("Not implemented!");
     }
   };
 

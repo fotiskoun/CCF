@@ -162,7 +162,8 @@ namespace ccf
             "Quote report data does not contain node's public key hash");
         case QuoteVerificationResult::FailedHostDataDigestNotFound:
           return std::make_pair(
-            HTTP_STATUS_UNAUTHORIZED, "Quote does not contain host data");
+            HTTP_STATUS_UNAUTHORIZED,
+            "Quote does not contain trusted host data");
         case QuoteVerificationResult::FailedInvalidHostData:
           return std::make_pair(
             HTTP_STATUS_UNAUTHORIZED, "Quote host data is not authorised");
@@ -255,7 +256,6 @@ namespace ccf
       auto nodes = tx.rw(network.nodes);
       auto node_endorsed_certificates =
         tx.rw(network.node_endorsed_certificates);
-      auto config = tx.ro(network.config)->get();
 
       auto conflicting_node_id =
         check_conflicting_node_network(tx, in.node_info_network);
@@ -384,7 +384,7 @@ namespace ccf
       openapi_info.description =
         "This API provides public, uncredentialed access to service and node "
         "state.";
-      openapi_info.document_version = "2.31.11";
+      openapi_info.document_version = "2.34.0";
     }
 
     void init_handlers() override
@@ -1542,7 +1542,8 @@ namespace ccf
           std::nullopt,
           ds::to_hex(in.code_digest.data),
           in.certificate_signing_request,
-          in.public_key};
+          in.public_key,
+          in.node_data};
         g.add_node(in.node_id, node_info);
         g.trust_node_code_id(in.code_digest, in.quote_info.format);
         if (in.quote_info.format == QuoteFormat::amd_sev_snp_v1)

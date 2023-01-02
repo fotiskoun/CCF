@@ -4,22 +4,20 @@ import infra.network
 import infra.e2e_args
 import infra.interfaces
 import suite.test_requirements as reqs
+import queue
 
 from executors.logging_app import LoggingExecutor
 from executors.wiki_cacher import WikiCacherExecutor
 from executors.util import executor_thread
 
 # pylint: disable=import-error
-import kv_pb2 as KV
-
-# pylint: disable=import-error
 import kv_pb2_grpc as Service
 
 # pylint: disable=import-error
-import stringops_pb2 as StringOps
+import misc_pb2 as Misc
 
 # pylint: disable=import-error
-import stringops_pb2_grpc as StringOpsService
+import misc_pb2_grpc as MiscService
 
 # pylint: disable=import-error
 import executor_registration_pb2 as ExecutorRegistration
@@ -37,32 +35,11 @@ import http
 import random
 import threading
 import time
-from collections import defaultdict
 
 from loguru import logger as LOG
 
 
-@contextlib.contextmanager
-def wrap_tx(stub, primary):
-    with primary.client(connection_timeout=0.1) as c:
-        try:
-            # This wrapper is used to test the gRPC KV API directly. That is
-            # only possible when this executor is processing an active request
-            # (StartTx() returns a non-empty response). To trigger that, we do
-            # this placeholder GET request. It immediately times out and fails,
-            # but then the node we're speaking to will return a
-            # RequestDescription for us to operate over.
-            # This is a temporary hack to allow direct access to the KV API.
-            c.get("/placeholder", timeout=0.1, log_capture=[])
-        except Exception as e:
-            LOG.trace(e)
-        rd = stub.StartTx(Empty())
-        assert rd.HasField("optional"), rd
-        yield stub
-        stub.EndTx(KV.ResponseDescription())
-
-
-def register_new_executor(node, network, message=None):
+def register_new_executor(node, network, message=None, supported_endpoints=None):
     # Generate a new executor identity
     key_priv_pem, _ = infra.crypto.generate_ec_keypair()
     cert = infra.crypto.generate_cert(key_priv_pem)
@@ -73,8 +50,11 @@ def register_new_executor(node, network, message=None):
         message.attestation.format = ExecutorRegistration.Attestation.AMD_SEV_SNP_V1
         message.attestation.quote = b"testquote"
         message.attestation.endorsements = b"testendorsement"
-
         message.supported_endpoints.add(method="GET", uri="/app/foo/bar")
+
+        if supported_endpoints:
+            for method, uri in supported_endpoints:
+                message.supported_endpoints.add(method=method, uri=uri)
 
     message.cert = cert.encode()
 
@@ -133,127 +113,24 @@ def test_executor_registration(network, args):
             ) as channel:
                 should_pass = node == primary and credentials == executor_credentials
                 try:
-                    rd = Service.KVStub(channel).StartTx(Empty())
-                    assert should_pass, "Expected StartTx to fail"
-                    assert not rd.HasField("optional")
+                    stub = Service.KVStub(channel)
+                    for m in stub.Activate(Empty(), timeout=1):
+                        assert m.HasField(
+                            "activated"
+                        ), f"Expected only an activated message, not: {m}"
                 except grpc.RpcError as e:
-                    # NB: This failure will have printed errors like:
-                    #   Error parsing metadata: error=invalid value key=content-type value=application/json
-                    # These are harmless and expected, and I haven't found a way to swallow them
-                    assert not should_pass
                     # pylint: disable=no-member
-                    assert e.code() == grpc.StatusCode.UNAUTHENTICATED, e
-
-    return network
-
-
-@reqs.description("Test basic KV operations via external executor app")
-def test_kv(network, args):
-    primary, _ = network.find_primary()
-
-    executor_a = register_new_executor(primary, network)
-    executor_b = register_new_executor(primary, network)
-
-    my_table = "public:my_table"
-    my_key = b"my_key"
-    my_value = b"my_value"
-
-    with grpc.secure_channel(
-        target=primary.get_public_rpc_address(),
-        credentials=executor_a,
-    ) as channel:
-        stub = Service.KVStub(channel)
-
-        with wrap_tx(stub, primary) as tx:
-            LOG.info(f"Put key {my_key} in table '{my_table}'")
-            tx.Put(KV.KVKeyValue(table=my_table, key=my_key, value=my_value))
-
-        with wrap_tx(stub, primary) as tx:
-            LOG.info(f"Get key {my_key} in table '{my_table}'")
-            r = tx.Get(KV.KVKey(table=my_table, key=my_key))
-            assert r.HasField("optional")
-            assert r.optional.value == my_value
-            LOG.success(f"Successfully read key {my_key} in table '{my_table}'")
-
-        unknown_key = b"unknown_key"
-        with wrap_tx(stub, primary) as tx:
-            LOG.info(f"Get unknown key {unknown_key} in table '{my_table}'")
-            r = tx.Get(KV.KVKey(table=my_table, key=unknown_key))
-            assert not r.HasField("optional")
-            LOG.success(f"Unable to read key {unknown_key} as expected")
-
-        tables = ("public:table_a", "public:table_b", "public:table_c")
-        writes = [
-            (
-                random.choice(tables),
-                f"Key{i}".encode(),
-                random.getrandbits(((i % 16) + 1) * 8).to_bytes(((i % 16) + 1), "big"),
-            )
-            for i in range(10)
-        ]
-
-        with wrap_tx(stub, primary) as tx:
-            LOG.info("Write multiple entries in single transaction")
-            for t, k, v in writes:
-                tx.Put(KV.KVKeyValue(table=t, key=k, value=v))
-
-            LOG.info("Read own writes")
-            for t, k, v in writes:
-                r = tx.Get(KV.KVKeyValue(table=t, key=k))
-                assert r.HasField("optional")
-                assert r.optional.value == v
-
-            LOG.info("Snapshot isolation")
-            with grpc.secure_channel(
-                target=primary.get_public_rpc_address(),
-                credentials=executor_b,
-            ) as channel_alt:
-                stub_alt = Service.KVStub(channel_alt)
-                with wrap_tx(stub_alt, primary) as tx2:
-                    for t, k, v in writes:
-                        r = tx2.Get(KV.KVKey(table=t, key=k))
-                        assert not r.HasField("optional")
-                        LOG.success(
-                            f"Unable to read key {k} from table {t} (in concurrent transaction) as expected"
-                        )
-
-        with wrap_tx(stub, primary) as tx3:
-            LOG.info("Read applied writes")
-            for t, k, v in writes:
-                r = tx3.Get(KV.KVKeyValue(table=t, key=k))
-                assert r.HasField("optional")
-                assert r.optional.value == v
-
-            writes_by_table = defaultdict(dict)
-            for t, k, v in writes:
-                writes_by_table[t][k] = v
-
-            for t, table_writes in writes_by_table.items():
-                LOG.info(f"Read all in {t}")
-                r = tx3.GetAll(KV.KVTable(table=t))
-                count = 0
-                for result in r:
-                    count += 1
-                    assert result.key in table_writes
-                    assert table_writes[result.key] == result.value
-                assert count == len(table_writes)
-
-            LOG.info("Clear one table")
-            t, cleared_writes = writes_by_table.popitem()
-            tx3.Clear(KV.KVTable(table=t))
-            for k, _ in cleared_writes.items():
-                r = tx3.Has(KV.KVKey(table=t, key=k))
-                assert not r.present
-
-                r = tx3.Get(KV.KVKey(table=t, key=k))
-                assert not r.HasField("optional")
-
-                r = tx3.GetAll(KV.KVTable(table=t))
-                try:
-                    next(r)
-                    raise AssertionError("Expected unreachable")
-                except StopIteration:
-                    pass
+                    if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
+                        assert (
+                            should_pass
+                        ), "Expected Activate to fail with an auth error"
+                    else:
+                        # NB: This failure will have printed errors like:
+                        #  Error parsing metadata: error=invalid value key=content-type value=application/json
+                        # These are harmless and expected, and I haven't found a way to swallow them
+                        assert not should_pass
+                        # pylint: disable=no-member
+                        assert e.code() == grpc.StatusCode.UNAUTHENTICATED, e
 
     return network
 
@@ -261,15 +138,24 @@ def test_kv(network, args):
 def test_simple_executor(network, args):
     primary, _ = network.find_primary()
 
-    credentials = register_new_executor(primary, network)
+    wikicacher_executor = WikiCacherExecutor(primary)
+    supported_endpoints = wikicacher_executor.get_supported_endpoints({"Earth"})
 
-    with executor_thread(WikiCacherExecutor(primary, credentials)):
+    credentials = register_new_executor(
+        primary, network, supported_endpoints=supported_endpoints
+    )
+
+    # Note: There should be a distinct kind of 404 here - this supported endpoint is _registered_, but no executor is _active_
+
+    wikicacher_executor.credentials = credentials
+    with executor_thread(wikicacher_executor):
         with primary.client() as c:
             r = c.post("/not/a/real/endpoint")
             assert r.status_code == http.HTTPStatus.NOT_FOUND
 
             r = c.get("/article_description/Earth")
             assert r.status_code == http.HTTPStatus.NOT_FOUND
+            # Note: This should be a distinct kind of 404 - reached an executor, and it returned a custom 404
 
             r = c.post("/update_cache/Earth")
             assert r.status_code == http.HTTPStatus.OK
@@ -291,9 +177,6 @@ def test_parallel_executors(network, args):
         "England",
         "Scotland",
         "France",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
         "Red",
         "Green",
         "Blue",
@@ -319,10 +202,19 @@ def test_parallel_executors(network, args):
 
     with contextlib.ExitStack() as stack:
         for i in range(executor_count):
-            credentials = register_new_executor(primary, network)
-            executor = WikiCacherExecutor(primary, credentials, label=f"Executor {i}")
-            executors.append(executor)
-            stack.enter_context(executor_thread(executor))
+
+            wikicacher_executor = WikiCacherExecutor(primary, label=f"Executor {i}")
+            supported_endpoints = wikicacher_executor.get_supported_endpoints(
+                {topics[i]}
+            )
+
+            credentials = register_new_executor(
+                primary, network, supported_endpoints=supported_endpoints
+            )
+
+            wikicacher_executor.credentials = credentials
+            executors.append(wikicacher_executor)
+            stack.enter_context(executor_thread(wikicacher_executor))
 
         for executor in executors:
             assert executor.handled_requests_count == 0
@@ -360,11 +252,11 @@ def test_streaming(network, args):
     )
 
     def echo_op(s):
-        return (StringOps.OpIn(echo=StringOps.EchoOp(body=s)), ("echoed", s))
+        return (Misc.OpIn(echo=Misc.EchoOp(body=s)), ("echoed", s))
 
     def reverse_op(s):
         return (
-            StringOps.OpIn(reverse=StringOps.ReverseOp(body=s)),
+            Misc.OpIn(reverse=Misc.ReverseOp(body=s)),
             ("reversed", s[::-1]),
         )
 
@@ -372,13 +264,13 @@ def test_streaming(network, args):
         start = random.randint(0, len(s))
         end = random.randint(start, len(s))
         return (
-            StringOps.OpIn(truncate=StringOps.TruncateOp(body=s, start=start, end=end)),
+            Misc.OpIn(truncate=Misc.TruncateOp(body=s, start=start, end=end)),
             ("truncated", s[start:end]),
         )
 
     def empty_op(s):
         # oneof may always be null - generate some like this to make sure they're handled "correctly"
-        return (StringOps.OpIn(), None)
+        return (Misc.OpIn(), None)
 
     def generate_ops(n):
         for _ in range(n):
@@ -411,12 +303,160 @@ def test_streaming(network, args):
         target=primary.get_public_rpc_address(),
         credentials=credentials,
     ) as channel:
-        stub = StringOpsService.TestStub(channel)
+        stub = MiscService.TestStub(channel)
 
         compare_op_results(stub, 0)
         compare_op_results(stub, 1)
-        compare_op_results(stub, 30)
+        compare_op_results(stub, 20)
         compare_op_results(stub, 1000)
+
+    return network
+
+
+@reqs.description("Test server async gRPC streaming APIs")
+def test_async_streaming(network, args):
+    primary, _ = network.find_primary()
+
+    credentials = grpc.ssl_channel_credentials(
+        open(os.path.join(network.common_dir, "service_cert.pem"), "rb").read()
+    )
+    with grpc.secure_channel(
+        target=f"{primary.get_public_rpc_host()}:{primary.get_public_rpc_port()}",
+        credentials=credentials,
+    ) as channel:
+        s = MiscService.TestStub(channel)
+
+        event_name = "name_of_my_event"
+
+        events = queue.Queue()
+        subscription_started = threading.Event()
+
+        def subscribe(event_name):
+            credentials = grpc.ssl_channel_credentials(
+                open(os.path.join(network.common_dir, "service_cert.pem"), "rb").read()
+            )
+            with grpc.secure_channel(
+                target=f"{primary.get_public_rpc_host()}:{primary.get_public_rpc_port()}",
+                credentials=credentials,
+            ) as subscriber_channel:
+                sub_stub = MiscService.TestStub(subscriber_channel)
+                LOG.debug(f"Waiting for event {event_name}...")
+                for e in sub_stub.Sub(Misc.Event(name=event_name)):  # Blocking
+                    if e.HasField("started"):
+
+                        # While we're here, confirm that errors can be returned when calling a streaming RPC.
+                        # In this case, from trying to subscribe multiple times
+                        try:
+                            for e in sub_stub.Sub(Misc.Event(name=event_name)):
+                                assert False, "Expected this to be unreachable"
+                        except grpc.RpcError as e:
+                            # pylint: disable=no-member
+                            assert e.code() == grpc.StatusCode.FAILED_PRECONDITION, e
+                            assert (
+                                f"Already have a subscriber for {event_name}"
+                                in e.details()
+                            ), e
+
+                        subscription_started.set()
+                    elif e.HasField("terminated"):
+                        break
+                    else:
+                        LOG.info(f"Received update for event {event_name}")
+                        events.put(("sub", e.event_info))
+                        sub_stub.Ack(e.event_info)
+
+        t = threading.Thread(target=subscribe, args=(event_name,))
+        t.start()
+
+        # Wait for subscription thread to actually start, and the server has confirmed it is ready
+        assert subscription_started.wait(timeout=3), "Subscription wait timed out"
+
+        event_count = 5
+        event_contents = [f"contents {i}" for i in range(event_count)]
+        LOG.info(f"Publishing events for {event_name}")
+
+        for contents in event_contents:
+            e = Misc.EventInfo(name=event_name, message=contents)
+            LOG.info("Adding pub event")
+            events.put(("pub", e))
+            s.Pub(e)
+            # Sleep to try and ensure that the sub happens next, rather than the next pub in this loop
+            time.sleep(0.2)
+        s.Terminate(Misc.Event(name=event_name))
+
+        t.join()
+
+        # Note: Subscriber stream is now closed but session is still open
+
+        # Assert that all the published events were received by the subscriber,
+        # and the pubs and subs were correctly interleaved
+        sub_events_left = len(event_contents)
+        expect_pub = True
+        while events.qsize() > 0:
+            kind, next_event = events.get()
+            assert next_event.name == event_name
+            assert next_event.message == event_contents[0]
+
+            if expect_pub:
+                assert kind == "pub"
+            else:
+                assert kind == "sub"
+                event_contents.pop(0)
+                sub_events_left -= 1
+            expect_pub = not expect_pub
+        assert sub_events_left == 0
+
+        # Check that subscriber was automatically unregistered on server when subscriber
+        # client stream was closed
+        try:
+            s.Pub(Misc.EventInfo(name=event_name, message="Hello"))
+            assert False, "Publishing event without subscriber should return an error"
+        except grpc.RpcError as e:
+            # pylint: disable=no-member
+            assert e.code() == grpc.StatusCode.NOT_FOUND, e
+            # pylint: disable=no-member
+            assert e.details() == f"Updates for event {event_name} has no subscriber"
+
+    return network
+
+
+@reqs.description("Test multiple executors that support the same endpoint")
+def test_multiple_executors(network, args):
+    primary, _ = network.find_primary()
+
+    # register executor_a
+    wikicacher_executor_a = WikiCacherExecutor(primary)
+    supported_endpoints_a = wikicacher_executor_a.get_supported_endpoints({"Monday"})
+
+    executor_a_credentials = register_new_executor(
+        primary, network, supported_endpoints=supported_endpoints_a
+    )
+    wikicacher_executor_a.credentials = executor_a_credentials
+
+    # register executor_b
+    supported_endpoints_b = [("GET", "/article_description/Monday")]
+    executor_b_credentials = register_new_executor(
+        primary, network, supported_endpoints=supported_endpoints_b
+    )
+    wikicacher_executor_b = WikiCacherExecutor(primary)
+    wikicacher_executor_b.credentials = executor_b_credentials
+
+    with executor_thread(wikicacher_executor_a):
+        with primary.client() as c:
+            r = c.post("/update_cache/Monday")
+            assert r.status_code == http.HTTPStatus.OK, r
+            content = r.body.text().splitlines()[-1]
+
+            r = c.get("/article_description/Monday")
+            assert r.status_code == http.HTTPStatus.OK, r
+            assert r.body.text() == content, r
+
+    # /article_description/Monday this time will be passed to executor_b
+    with executor_thread(wikicacher_executor_b):
+        with primary.client() as c:
+            r = c.get("/article_description/Monday")
+            assert r.status_code == http.HTTPStatus.OK, r
+            assert r.body.text() == content, r
 
     return network
 
@@ -424,9 +464,17 @@ def test_streaming(network, args):
 def test_logging_executor(network, args):
     primary, _ = network.find_primary()
 
-    credentials = register_new_executor(primary, network)
+    logging_executor = LoggingExecutor(primary)
+    logging_executor.add_supported_endpoints(("PUT", "/test/endpoint"))
+    supported_endpoints = logging_executor.supported_endpoints
 
-    with executor_thread(LoggingExecutor(primary, credentials)):
+    credentials = register_new_executor(
+        primary, network, supported_endpoints=supported_endpoints
+    )
+
+    logging_executor.credentials = credentials
+
+    with executor_thread(logging_executor):
         with primary.client() as c:
             log_id = 42
             log_msg = "Hello world"
@@ -462,11 +510,12 @@ def run(args):
             ), "Target node does not support HTTP/2"
 
         network = test_executor_registration(network, args)
-        network = test_kv(network, args)
         network = test_simple_executor(network, args)
         network = test_parallel_executors(network, args)
         network = test_streaming(network, args)
+        network = test_async_streaming(network, args)
         network = test_logging_executor(network, args)
+        network = test_multiple_executors(network, args)
 
 
 if __name__ == "__main__":
@@ -475,7 +524,6 @@ if __name__ == "__main__":
     args.package = "src/apps/external_executor/libexternal_executor"
     args.http2 = True  # gRPC interface
     args.nodes = infra.e2e_args.min_nodes(args, f=1)
-
     # Note: set following envvar for debug logs:
     # GRPC_VERBOSITY=DEBUG GRPC_TRACE=client_channel,http2_stream_state,http
 

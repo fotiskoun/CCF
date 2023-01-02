@@ -3,67 +3,16 @@
 #pragma once
 
 #include "ccf/odata_error.h"
-#include "ds/serialized.h"
 #include "message.h"
+#include "node/rpc/rpc_context_impl.h"
 #include "node/rpc/rpc_exception.h"
-#include "status.h"
+#include "stream.h"
+#include "types.h"
 
-#include <arpa/inet.h>
-#include <google/protobuf/empty.pb.h>
-#include <variant>
-#include <vector>
+#include <memory>
 
 namespace ccf::grpc
 {
-  template <typename T>
-  struct SuccessResponse
-  {
-    T body;
-    ccf::protobuf::Status status;
-
-    SuccessResponse(const T& body_, ccf::protobuf::Status status_) :
-      body(body_),
-      status(status_)
-    {}
-  };
-
-  struct ErrorResponse
-  {
-    ccf::protobuf::Status status;
-    ErrorResponse(ccf::protobuf::Status status_) : status(status_) {}
-  };
-
-  template <typename T>
-  using GrpcAdapterResponse = std::variant<ErrorResponse, SuccessResponse<T>>;
-
-  template <typename T>
-  GrpcAdapterResponse<T> make_success(const T& t)
-  {
-    return SuccessResponse(t, make_grpc_status_ok());
-  }
-
-  GrpcAdapterResponse<google::protobuf::Empty> make_success()
-  {
-    return SuccessResponse(google::protobuf::Empty{}, make_grpc_status_ok());
-  }
-
-  ErrorResponse make_error(
-    grpc_status code,
-    const std::string& msg,
-    const std::optional<std::string>& details = std::nullopt)
-  {
-    return ErrorResponse(make_grpc_status(code, msg, details));
-  }
-
-  template <typename T>
-  GrpcAdapterResponse<T> make_error(
-    grpc_status code,
-    const std::string& msg,
-    const std::optional<std::string>& details = std::nullopt)
-  {
-    return ErrorResponse(make_grpc_status(code, msg, details));
-  }
-
   template <typename In>
   In get_grpc_payload(const std::shared_ptr<ccf::RpcContext>& ctx)
   {
@@ -139,39 +88,52 @@ namespace ccf::grpc
     }
   }
 
+  inline void set_grpc_default_headers(
+    const std::shared_ptr<ccf::RpcContext>& ctx)
+  {
+    for (auto const& h : default_response_headers)
+    {
+      ctx->set_response_header(h.first, h.second);
+    }
+  }
+
+  inline void set_grpc_response_trailers(
+    const std::shared_ptr<ccf::RpcContext>& ctx,
+    const ccf::protobuf::Status& status)
+  {
+    ctx->set_response_trailer(make_status_trailer(status.code()));
+    ctx->set_response_trailer(make_message_trailer(status.message()));
+  }
+
   template <typename Out>
   void set_grpc_response(
     const GrpcAdapterResponse<Out>& r,
     const std::shared_ptr<ccf::RpcContext>& ctx)
   {
-    auto success_response = std::get_if<SuccessResponse<Out>>(&r);
-    if (success_response != nullptr)
+    set_grpc_default_headers(ctx);
+
+    if (auto success_response = std::get_if<SuccessResponse<Out>>(&r))
     {
-      std::vector<uint8_t> r;
+      std::vector<uint8_t> v;
 
       if constexpr (nonstd::is_std_vector<Out>::value)
       {
-        r = make_grpc_messages(success_response->body);
+        v = serialise_grpc_messages(success_response->body);
       }
       else
       {
-        r = make_grpc_message(success_response->body);
+        v = serialise_grpc_message(success_response->body);
       }
 
-      ctx->set_response_body(r);
-      ctx->set_response_header(
-        http::headers::CONTENT_TYPE, http::headervalues::contenttype::GRPC);
+      ctx->set_response_body(v);
 
-      ctx->set_response_trailer("grpc-status", success_response->status.code());
-      ctx->set_response_trailer(
-        "grpc-message", success_response->status.message());
+      set_grpc_response_trailers(ctx, success_response->status);
     }
-    else
+    else if (std::get_if<ErrorResponse>(&r))
     {
       auto error_response = std::get<ErrorResponse>(r);
-      ctx->set_response_trailer("grpc-status", error_response.status.code());
-      ctx->set_response_trailer(
-        "grpc-message", error_response.status.message());
+
+      set_grpc_response_trailers(ctx, error_response.status);
     }
   }
 }
@@ -180,15 +142,20 @@ namespace ccf
 {
   template <typename In, typename Out>
   using GrpcEndpoint = std::function<grpc::GrpcAdapterResponse<Out>(
-    endpoints::EndpointContext& ctx, In&& payload)>;
+    endpoints::EndpointContext&, In&&)>;
 
   template <typename In, typename Out>
   using GrpcReadOnlyEndpoint = std::function<grpc::GrpcAdapterResponse<Out>(
-    endpoints::ReadOnlyEndpointContext& ctx, In&& payload)>;
+    endpoints::ReadOnlyEndpointContext&, In&&)>;
 
   template <typename In, typename Out>
   using GrpcCommandEndpoint = std::function<grpc::GrpcAdapterResponse<Out>(
-    endpoints::CommandEndpointContext& ctx, In&& payload)>;
+    endpoints::CommandEndpointContext&, In&&)>;
+
+  template <typename In, typename Out>
+  using GrpcCommandUnaryStreamEndpoint =
+    std::function<grpc::GrpcAdapterStreamingResponse(
+      endpoints::CommandEndpointContext&, In&&, grpc::StreamPtr<Out>&&)>;
 
   template <typename In, typename Out>
   endpoints::EndpointFunction grpc_adapter(const GrpcEndpoint<In, Out>& f)
@@ -216,6 +183,26 @@ namespace ccf
     return [f](endpoints::CommandEndpointContext& ctx) {
       grpc::set_grpc_response<Out>(
         f(ctx, grpc::get_grpc_payload<In>(ctx.rpc_ctx)), ctx.rpc_ctx);
+    };
+  }
+
+  // Note: For now, only command endpoints (i.e. with no kv::Tx) support gRPC
+  // server streaming.
+  template <typename In, typename Out>
+  endpoints::CommandEndpointFunction grpc_command_unary_stream_adapter(
+    const GrpcCommandUnaryStreamEndpoint<In, Out>& f)
+  {
+    return [f](endpoints::CommandEndpointContext& ctx) {
+      grpc::set_grpc_default_headers(ctx.rpc_ctx);
+      const auto result =
+        f(ctx,
+          grpc::get_grpc_payload<In>(ctx.rpc_ctx),
+          grpc::make_stream<Out>(ctx.rpc_ctx));
+
+      if (auto error_response = std::get_if<grpc::ErrorResponse>(&result))
+      {
+        grpc::set_grpc_response_trailers(ctx.rpc_ctx, error_response->status);
+      }
     };
   }
 }

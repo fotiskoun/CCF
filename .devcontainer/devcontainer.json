@@ -1,11 +1,12 @@
 {
   "name": "CCF Development Environment",
-  "image": "ccfmsrc.azurecr.io/ccf/ci:oe-0.18.4-dcap-ql-dev-virtual",
+  "image": "ccfmsrc.azurecr.io/ccf/ci:oe-0.18.4-hspec-virtual",
   "runArgs": [],
   "extensions": [
     "ms-vscode.cpptools",
     "ms-python.python",
-    "esbenp.prettier-vscode"
+    "esbenp.prettier-vscode",
+    "eamodio.gitlens"
   ],
   "settings": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
@@ -13,5 +14,11 @@
     "editor.codeActionsOnSave": {
       "source.fixAll": true
     }
-  }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-from-docker:1": {
+      "version": "latest"
+    }
+  },
+  "postCreateCommand": "DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install gdb -y"
 }
