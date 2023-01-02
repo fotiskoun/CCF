@@ -14,10 +14,10 @@ import time
 import http
 import sys
 
-sys.path.insert(0, "../tests/perf-system/generator")
+sys.path.insert(0, "../tests/piccolo/generator")
 import generator
 
-sys.path.insert(0, "../tests/perf-system/analyzer")
+sys.path.insert(0, "../tests/piccolo/analyzer")
 import analyzer
 
 

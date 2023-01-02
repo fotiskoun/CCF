@@ -1086,5 +1086,5 @@ install(FILES ${CMAKE_BINARY_DIR}/cmake/${CCF_PROJECT}-config.cmake
         DESTINATION ${CMAKE_INSTALL_PREFIX}/cmake
 )
 
-# Perf tool executable
-include(${CCF_DIR}/tests/perf-system/submitter/CMakeLists.txt)
+# Piccolo executable
+include(${CCF_DIR}/tests/piccolo/submitter/CMakeLists.txt)
